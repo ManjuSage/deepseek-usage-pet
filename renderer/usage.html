@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>DeepSeek 用量统计</title>
+  <link rel="stylesheet" href="usage.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>DeepSeek 用量统计</h1>
+    <div class="actions">
+      <button id="loginBtn" type="button" class="ghost">登录平台获取令牌</button>
+      <button id="syncBtn" type="button">立即同步</button>
+    </div>
+  </header>
+
+  <div class="manual-token">
+    <span>手动粘贴平台令牌：</span>
+    <input id="tokenInput" type="password" placeholder="userToken…" autocomplete="off">
+    <button id="tokenSave" type="button" class="ghost">保存</button>
+  </div>
+
+  <div class="sync-time">上次同步时间：<span id="syncTime">—</span></div>
+
+  <section id="summary" class="cards"></section>
+
+  <section class="block">
+    <div class="block-head">
+      <h2>每日用量（Tokens · 按类型堆叠，点击柱子看分时）</h2>
+      <div class="range-controls">
+        <div class="preset-btns">
+          <button class="preset-btn active" data-days="7">近 7 天</button>
+          <button class="preset-btn" data-days="30">近 30 天</button>
+          <button class="preset-btn" data-days="90">近 90 天</button>
+          <button class="preset-btn" data-days="365">近 365 天</button>
+        </div>
+        <div class="date-range">
+          <input id="rangeStart" type="date">
+          <span>至</span>
+          <input id="rangeEnd" type="date">
+        </div>
+      </div>
+    </div>
+    <div id="dailyChart" class="chart"></div>
+  </section>
+
+  <section class="block">
+    <h2 id="hourlyTitle">分时明细</h2>
+    <div id="hourlyChart" class="chart"></div>
+  </section>
+
+  <script src="echarts.min.js"></script>
+  <script src="usage.js"></script>
+</body>
+</html>
