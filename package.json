@@ -1,0 +1,89 @@
+{
+  "name": "deepseek-usage-pet",
+  "productName": "DeepSeek Usage Pet",
+  "version": "0.1.0",
+  "description": "DeepSeek 桌面小鲸鱼桌宠：余额监控 + 用量统计面板（日级/分时图表、历史回填、充值余额、同步时间）",
+  "main": "main.js",
+  "author": {
+    "name": "花彼岸"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "electron . --devtools",
+    "start:no-sandbox": "electron . --no-sandbox",
+    "smoke": "electron . --smoke-test",
+    "test": "node --test",
+    "dist": "electron-builder --linux",
+    "dist:linux": "electron-builder --linux",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:appimage": "electron-builder --linux AppImage",
+    "dist:deb": "electron-builder --linux deb"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.huabian.deepseek-usage-pet",
+    "productName": "DeepSeek Usage Pet",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**",
+      "renderer/**",
+      "assets/**",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm",
+        "tar.gz"
+      ],
+      "icon": "assets/DSniang1.png",
+      "category": "Utility",
+      "synopsis": "DeepSeek 余额小鲸鱼桌宠",
+      "description": "DeepSeek 余额小鲸鱼桌宠：余额监控、今日已用记账、峰谷定价、随机台词与音效。"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/DSniang1.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DeepSeek Usage Pet",
+      "uninstallDisplayName": "DeepSeek Usage Pet",
+      "multiLanguageInstaller": true,
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/DSniang1.png",
+      "category": "public.app-category.utilities",
+      "identity": null
+    },
+    "publish": null,
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.2"
+  }
+}
