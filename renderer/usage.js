@@ -11,11 +11,6 @@
   function gmt8Date(offsetDays) {
     return new Date(Date.now() + 8 * 3600 * 1000 + offsetDays * 86400 * 1000).toISOString().slice(0, 10)
   }
-  // 平台只保留「今天+昨天」的分时数据。
-  function isRecentDay(day) {
-    return day === gmt8Date(0) || day === gmt8Date(-1)
-  }
-
   // token 数量缩写（K/M/B）。
   function fmtTokens(n) {
     n = Number(n) || 0
@@ -127,13 +122,21 @@
     if (totals.length) await loadHourly(totals[totals.length - 1].utc_date)
   }
 
+  function hourlyHasData(detail) {
+    var hours = detail && detail.hours
+    if (!Array.isArray(hours)) return false
+    return hours.some(function (h) {
+      return (h.cache_hit || 0) + (h.cache_miss || 0) + (h.output || 0) + (h.requests || 0) + (h.cost || 0) > 0
+    })
+  }
+
   async function loadHourly(day) {
-    if (!isRecentDay(day)) {
-      document.getElementById('hourlyTitle').textContent = '分时明细 · ' + day + '（无分时数据，平台仅保留今天与昨天）'
+    var detail = await api.getUsageHourly(day)
+    if (!hourlyHasData(detail)) {
+      document.getElementById('hourlyTitle').textContent = '分时明细 · ' + day + '（无保存的分时数据：需在该日当天或次日同步过）'
       if (hourlyChart) hourlyChart.clear()
       return
     }
-    var detail = await api.getUsageHourly(day)
     renderHourly(detail)
   }
 

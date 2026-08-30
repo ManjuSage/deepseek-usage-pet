@@ -16,7 +16,7 @@
     theme: $('wm-theme'),
     apiKey: $('wm-apikey'), apiKeyEye: $('wm-apikey-eye'), apiKeyNote: $('wm-apikey-note'),
     token: $('wm-token'), tokenEye: $('wm-token-eye'), tokenLogin: $('wm-token-login'),
-    usage: $('wm-usage'), refresh: $('wm-refresh'), threshold: $('wm-threshold'), autostart: $('wm-autostart'),
+    usage: $('wm-usage'), refresh: $('wm-refresh'), threshold: $('wm-threshold'), autostart: $('wm-autostart'), autosync: $('wm-autosync'),
     bubble: $('wm-bubble'), bubbleInterval: $('wm-bubble-interval'), idleFade: $('wm-idlefade'),
     idleOpacity: $('wm-idle-opacity'), idleOpacityV: $('wm-idle-opacity-v'),
     scale: $('wm-scale'), scaleV: $('wm-scale-v'),
@@ -95,6 +95,7 @@
     els.refresh.value = String(cfg.refreshInterval || 60)
     els.threshold.value = String(cfg.lowBalanceThreshold != null ? cfg.lowBalanceThreshold : 10)
     els.autostart.checked = !!cfg.autostart
+    els.autosync.checked = cfg.autoSync !== false
     els.bubble.checked = cfg.bubbleOn !== false
     els.bubbleInterval.value = String(cfg.bubbleInterval != null ? cfg.bubbleInterval : 900)
     els.idleFade.checked = cfg.idleFade !== false
@@ -212,6 +213,7 @@
   els.bubble.addEventListener('change', function () { api.setConfig({ bubbleOn: els.bubble.checked }) })
   els.idleFade.addEventListener('change', function () { api.setConfig({ idleFade: els.idleFade.checked }) })
   els.autostart.addEventListener('change', function () { api.setConfig({ autostart: els.autostart.checked }) })
+  els.autosync.addEventListener('change', function () { api.setConfig({ autoSync: els.autosync.checked }) })
   els.alertImage.addEventListener('change', function () { api.setConfig({ alertImage: els.alertImage.checked }) })
 
   // ---------- 滑块（实时预览 + 防抖保存） ----------

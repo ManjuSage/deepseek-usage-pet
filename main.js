@@ -60,7 +60,7 @@ if (!gotLock) {
 }
 
 function main() {
-  app.whenReady().then(onReady)
+  app.whenReady().then(onReady).catch((err) => { console.error('[startup] 启动失败:', err && (err.stack || err.message || err)) })
   app.on('window-all-closed', () => {
     app.quit()
   })
@@ -77,7 +77,8 @@ async function onReady() {
   }
   balanceService = new balanceMod.BalanceService()
   linesMod.readPool() // 启动即生成随机台词默认池（~/.config/whale-pet/lines.json，首次）
-  syncUsage().catch((err) => console.warn('[usage] 启动同步失败: ' + ((err && err.message) || err)))
+  autoSyncIfStale() // 启动时立即检查一次（无令牌 / 未超时 / 已关闭则直接跳过）
+  setInterval(autoSyncIfStale, AUTO_SYNC_CHECK_MS) // 每小时检查一次，距上次同步超 12h 才补一次
   createPetWindow()
   applyNativeTheme()
   setupTray()
@@ -307,6 +308,43 @@ async function syncUsage() {
       expired: !!(err && err.expired),
       accountChanged: !!(err && err.accountChanged),
     }
+  }
+}
+
+// 轻量同步：仅最近两天日级 + 今昨分时 + 余额（自动同步用，不含历史回填）。
+async function syncUsageLight() {
+  const cfg = configMod.getEffective()
+  if (!cfg.platformToken) return { ok: false, error: '未配置平台令牌' }
+  try {
+    const r = await usageMod.syncRecent(cfg.platformToken)
+    return { ok: true, ...r }
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err) }
+  }
+}
+
+// 自动同步：每小时检查一次，距上次同步超过 12 小时且满足条件时做一次轻量同步。
+const AUTO_SYNC_CHECK_MS = 60 * 60 * 1000
+const AUTO_SYNC_STALE_MS = 12 * 60 * 60 * 1000
+let autoSyncing = false
+
+async function autoSyncIfStale() {
+  if (autoSyncing) return
+  const cfg = configMod.getEffective()
+  if (!cfg.platformToken || cfg.autoSync === false) return
+  let last = null
+  try { last = storeMod.getMeta('last_sync_at') } catch (e) {}
+  if (last) {
+    const t = Date.parse(last)
+    if (isFinite(t) && Date.now() - t < AUTO_SYNC_STALE_MS) return
+  }
+  autoSyncing = true
+  try {
+    await syncUsageLight()
+  } catch (err) {
+    console.warn('[usage] 自动同步失败: ' + ((err && err.message) || err))
+  } finally {
+    autoSyncing = false
   }
 }
 
