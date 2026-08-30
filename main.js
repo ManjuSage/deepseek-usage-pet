@@ -371,6 +371,21 @@ function openPlatformLogin() {
       try { win.destroy() } catch (e) {}
       resolve(token || null)
     }
+    // 登录窗安全护栏：限制导航到 deepseek.com、拒绝新窗口/权限请求
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//.test(url)) shell.openExternal(url)
+      return { action: 'deny' }
+    })
+    win.webContents.setPermissionRequestHandler((wc, permission, callback) => callback(false))
+    win.webContents.on('will-navigate', (event, url) => {
+      let host = ''
+      try { host = new URL(url).hostname } catch (e) {}
+      const ok = host === 'deepseek.com' || host.endsWith('.deepseek.com')
+      if (!ok) {
+        event.preventDefault()
+        if (/^https?:\/\//.test(url)) shell.openExternal(url)
+      }
+    })
     win.loadURL('https://platform.deepseek.com')
     win.on('closed', () => finish(null))
 
@@ -467,7 +482,7 @@ function setAutostart(enabled) {
 
 // ================================ 低余额通知 ==============================
 function checkLowBalance(payload) {
-  if (!payload || !payload.ok || !payload.ok) return
+  if (!payload || !payload.ok) return
   const cfg = configMod.getEffective()
   const th = Number(cfg.lowBalanceThreshold)
   const b = Number(payload.totalBalance)
@@ -517,9 +532,16 @@ async function getWorkAreaForPet() {
 
 function registerIpc() {
   // ---------- 配置 ----------
-  ipcMain.handle('config:get', () => {
+  ipcMain.handle('config:get', (e) => {
     const cfg = configMod.getEffective()
     if (process.env.WHALE_PET_TRACE === '1') console.log('[trace] config:get scale=' + cfg.scale + ' dir=' + configMod.CONFIG_DIR)
+    // 仅设置窗（menu.html）返回明文密钥；pet/usage 等其余窗口返回空，缩小密钥暴露面。
+    // 是否已配置仍可通过 apiKeySource / platformTokenSource 判断。
+    const isMenu = !!(e && e.senderFrame && /menu\.html(?:\?|#|$)/.test(e.senderFrame.url))
+    if (!isMenu) {
+      cfg.apiKey = ''
+      cfg.platformToken = ''
+    }
     // 附带配置路径，供设置窗「打开文件/目录」按钮使用
     cfg.paths = {
       config: configMod.CONFIG_FILE,
@@ -813,19 +835,28 @@ function registerIpc() {
 
   // ---------- 用系统默认程序打开文件/目录/URL（设置里的「打开」按钮）----------
   ipcMain.handle('shell:open-path', async (e, msg) => {
-    const target = String(msg && msg.path || '')
+    const target = String(msg && msg.path || '').replace(/^file:\/\//, '')
     if (!target) return { ok: false, error: 'empty path' }
+    // 白名单：只允许打开应用自己的配置/数据目录与文件，拒绝任意路径与 http(s)/file 目标
+    const norm = (p) => path.resolve(p).toLowerCase()
+    const allowed = new Set([
+      configMod.CONFIG_FILE,
+      configMod.USAGE_FILE,
+      linesMod.LINES_FILE,
+      configMod.CONFIG_DIR,
+      path.join(configMod.CONFIG_DIR, 'sounds'),
+      path.join(configMod.CONFIG_DIR, 'images'),
+    ].map(norm))
+    if (!allowed.has(norm(target))) return { ok: false, error: 'forbidden path' }
     try {
-      if (/^(https?:|file:)/.test(target)) { await shell.openExternal(target); return { ok: true } }
-      const p = target.replace(/^file:\/\//, '')
       // 目录（如 images/sounds）可能尚未创建 → 先建目录再打开
-      if (!fs.existsSync(p)) {
-        try { fs.mkdirSync(p, { recursive: true }) } catch (e) { /* 忽略 */ }
+      if (!fs.existsSync(target)) {
+        try { fs.mkdirSync(target, { recursive: true }) } catch (e) { /* 忽略 */ }
       }
-      let err = await shell.openPath(p)
-      if (err && fs.existsSync(p)) {
+      let err = await shell.openPath(target)
+      if (err && fs.existsSync(target)) {
         // 文件打开失败（如无法识别）→ 打开所在目录
-        err = await shell.openPath(path.dirname(p))
+        err = await shell.openPath(path.dirname(target))
       } else if (err) {
         // 目标不存在 → 打开配置目录
         await shell.openPath(configMod.CONFIG_DIR)

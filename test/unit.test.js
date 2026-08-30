@@ -192,6 +192,29 @@ test('ledger: 余额下降累计 / 充值不扣减 / 跨天归档', () => {
   assert.strictEqual(led.lastBalance, 40)
 })
 
+test('ledger: 跨天标记 + seedToday 补录起点且不重复累加', () => {
+  for (const f of fs.readdirSync(TEST_HOME)) fs.rmSync(path.join(TEST_HOME, f), { recursive: true, force: true })
+
+  // 伪造昨天的账本 → 今天第一次观测应返回 crossed=true 且归零
+  fs.writeFileSync(ledger.USAGE_FILE, JSON.stringify({ date: '2000-01-01', lastBalance: 50, todayUsage: 7, history: {} }))
+  let led = ledger.recordBalance(40)
+  assert.strictEqual(led.crossed, true)
+  assert.strictEqual(led.todayUsage, 0)
+
+  // 用平台今日用量补录起点
+  led = ledger.seedToday(12.5)
+  assert.strictEqual(led.todayUsage, 12.5)
+
+  // 之后余额下降 → 在补录值上累加，而不是从头算
+  led = ledger.recordBalance(35)
+  assert.strictEqual(led.crossed, false)
+  assert.strictEqual(led.todayUsage, 17.5)
+
+  // 非正值补录不覆盖已有值
+  ledger.seedToday(0)
+  assert.strictEqual(ledger.readLedger().todayUsage, 17.5)
+})
+
 // ---------- 配置 ----------
 test('config: 消毒 / 原子保存 / 环境变量覆盖', () => {
   // 越界值归一
@@ -263,9 +286,11 @@ test('config: 消毒 / 原子保存 / 环境变量覆盖', () => {
   eff = config.getEffective()
   assert.strictEqual(eff.apiKey, 'sk-123')
 
-  // 配置文件权限 0600（含密钥）
-  const mode = fs.statSync(config.CONFIG_FILE).mode & 0o777
-  assert.strictEqual(mode, 0o600)
+  // 配置文件权限 0600（含密钥）—— 仅 Unix 有效，Windows 无此语义
+  if (process.platform !== 'win32') {
+    const mode = fs.statSync(config.CONFIG_FILE).mode & 0o777
+    assert.strictEqual(mode, 0o600)
+  }
 })
 
 // ---------- 随机台词池（lines.json） ----------
