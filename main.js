@@ -643,14 +643,18 @@ function registerIpc() {
   ipcMain.handle('usage:daily', (e, msg) => {
     const start = msg && msg.start
     const end = msg && msg.end
-    if (!start || !end) return { totals: [], byModel: [], costTotals: [] }
+    if (!start || !end) return { totals: [], byModel: [], byKey: [], modelTotals: [], costTotals: [] }
     return {
       totals: storeMod.getDailyTotals(start, end),
       byModel: storeMod.getDailyByModel(start, end),
+      byKey: storeMod.getDailyByKey(start, end),
+      modelTotals: storeMod.getModelTotals(start, end),
       costTotals: storeMod.getDailyCostTotals(start, end),
+      costByModel: storeMod.getDailyCostByModel(start, end),
+      costByKey: storeMod.getDailyCostByKey(start, end),
     }
   })
-  ipcMain.handle('usage:hourly', (e, msg) => storeMod.getHourlyDetail((msg && msg.day) || ''))
+  ipcMain.handle('usage:hourly', (e, msg) => storeMod.getHourlyDetail((msg && msg.day) || '', (msg && msg.dim) || 'type'))
 
   // ---------- 平台令牌登录 ----------
   ipcMain.handle('platform:login', async () => {

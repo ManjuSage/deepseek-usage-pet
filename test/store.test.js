@@ -73,10 +73,45 @@ test('store: 用量查询方法（daily/hourly/summary/range）', async () => {
   assert.strictEqual(byModel.length, 1)
   assert.strictEqual(byModel[0].output, 50)
 
+  const byKey = store.getDailyByKey('2026-08-28', '2026-08-28')
+  assert.strictEqual(byKey.length, 1)
+  assert.strictEqual(byKey[0].api_key_name, 'codex')
+  assert.strictEqual(byKey[0].output, 50)
+
+  const modelTotals = store.getModelTotals('2026-08-28', '2026-08-28')
+  assert.strictEqual(modelTotals.length, 1)
+  assert.strictEqual(modelTotals[0].model, 'deepseek-v4-pro')
+  assert.strictEqual(modelTotals[0].tokens, 1250)
+  assert.strictEqual(modelTotals[0].cost.CNY, 1.5)
+
+  const costByModel = store.getDailyCostByModel('2026-08-28', '2026-08-28')
+  assert.strictEqual(costByModel.length, 1)
+  assert.strictEqual(costByModel[0].model, 'deepseek-v4-pro')
+  assert.strictEqual(costByModel[0].cost, 1.5)
+
+  const costByKey = store.getDailyCostByKey('2026-08-28', '2026-08-28')
+  assert.strictEqual(costByKey.length, 1)
+  assert.strictEqual(costByKey[0].api_key_name, 'codex')
+  assert.strictEqual(costByKey[0].cost, 1.5)
+
   const hourly = store.getHourlyDetail('2026-08-28')
-  assert.strictEqual(hourly.hours.length, 24)
-  assert.strictEqual(hourly.hours[10].output, 40)
-  assert.strictEqual(hourly.hours[10].cost, 0.5)
+  assert.strictEqual(hourly.dim, 'type')
+  assert.strictEqual(hourly.series.length, 3)
+  assert.strictEqual(hourly.cost.length, 24)
+  assert.strictEqual(hourly.series[2].data[10], 40)
+  assert.strictEqual(hourly.cost[10], 0.5)
+
+  const hourlyByModel = store.getHourlyDetail('2026-08-28', 'model')
+  assert.strictEqual(hourlyByModel.dim, 'model')
+  assert.strictEqual(hourlyByModel.series.length, 1)
+  assert.strictEqual(hourlyByModel.series[0].name, 'deepseek-v4-pro')
+  assert.strictEqual(hourlyByModel.series[0].data[10], 40)
+
+  const hourlyByKey = store.getHourlyDetail('2026-08-28', 'key')
+  assert.strictEqual(hourlyByKey.dim, 'key')
+  assert.strictEqual(hourlyByKey.series.length, 1)
+  assert.strictEqual(hourlyByKey.series[0].name, 'codex')
+  assert.strictEqual(hourlyByKey.series[0].data[10], 40)
 
   const summary = store.getSummary()
   assert.strictEqual(summary.tokens, 1250)

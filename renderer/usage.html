@@ -11,45 +11,109 @@
     <h1>DeepSeek 用量统计</h1>
     <div class="actions">
       <button id="loginBtn" type="button" class="ghost">登录平台获取令牌</button>
+      <button id="manualTokenBtn" type="button" class="ghost">手动粘贴令牌</button>
       <button id="syncBtn" type="button">立即同步</button>
       <button id="cancelSyncBtn" type="button" class="ghost" style="display:none">取消同步</button>
     </div>
   </header>
 
-  <div class="manual-token">
-    <span>手动粘贴平台令牌：</span>
-    <input id="tokenInput" type="password" placeholder="userToken…" autocomplete="off">
-    <button id="tokenSave" type="button" class="ghost">保存</button>
-  </div>
-
   <div class="sync-time">上次同步时间：<span id="syncTime">—</span></div>
+
+  <div class="range-toolbar">
+    <span class="range-label">时间范围</span>
+    <div class="preset-btns">
+      <button class="preset-btn active" data-days="7">近 7 天</button>
+      <button class="preset-btn" data-days="30">近 30 天</button>
+      <button class="preset-btn" data-days="90">近 90 天</button>
+      <button class="preset-btn" data-days="365">近 365 天</button>
+    </div>
+    <div class="date-range">
+      <input id="rangeStart" type="date">
+      <span>至</span>
+      <input id="rangeEnd" type="date">
+    </div>
+  </div>
 
   <section id="summary" class="cards"></section>
 
-  <section class="block">
-    <div class="block-head">
-      <h2>每日用量（Tokens · 按类型堆叠，点击柱子看分时）</h2>
-      <div class="range-controls">
-        <div class="preset-btns">
-          <button class="preset-btn active" data-days="7">近 7 天</button>
-          <button class="preset-btn" data-days="30">近 30 天</button>
-          <button class="preset-btn" data-days="90">近 90 天</button>
-          <button class="preset-btn" data-days="365">近 365 天</button>
-        </div>
-        <div class="date-range">
-          <input id="rangeStart" type="date">
-          <span>至</span>
-          <input id="rangeEnd" type="date">
-        </div>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>每日用量走势</h2>
+      <div class="seg" id="dailyViewSeg">
+        <button data-view="model" class="active">按模型</button>
+        <button data-view="type">按计费类型</button>
+        <button data-view="key">按 API Key</button>
+      </div>
+      <div class="seg" id="dailyMetricSeg">
+        <button data-metric="tokens" class="active">按 Tokens</button>
+        <button data-metric="cost">按花费</button>
       </div>
     </div>
-    <div id="dailyChart" class="chart"></div>
+    <div id="dailyChart" class="chart chart-lg"></div>
   </section>
 
-  <section class="block">
-    <h2 id="hourlyTitle">分时明细</h2>
-    <div id="hourlyChart" class="chart"></div>
+  <section class="grid-2">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>各模型占比</h2>
+        <div class="seg" id="modelsMetricSeg">
+          <button data-metric="tokens" class="active">按 Tokens</button>
+          <button data-metric="cost">按花费</button>
+        </div>
+      </div>
+      <div id="modelsChart" class="chart chart-md"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>累计趋势</h2>
+        <div class="seg" id="cumulativeMetricSeg">
+          <button data-metric="tokens" class="active">Tokens</button>
+          <button data-metric="cost">花费</button>
+        </div>
+      </div>
+      <div id="cumulativeChart" class="chart chart-md"></div>
+    </div>
   </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>用量热力图</h2>
+      <div class="seg" id="heatmapMetricSeg">
+        <button data-metric="tokens" class="active">按 Tokens</button>
+        <button data-metric="cost">按花费</button>
+      </div>
+    </div>
+    <div id="heatmapChart" class="chart chart-heat"></div>
+  </section>
+
+  <div class="modal-mask hidden" id="tokenModal">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3>手动粘贴平台令牌</h3>
+        <button id="tokenClose" class="modal-close" type="button">×</button>
+      </div>
+      <p class="modal-tip">登录 platform.deepseek.com 后，在浏览器控制台执行 <code>JSON.parse(localStorage.userToken).value</code>，把结果粘贴到下面。</p>
+      <textarea id="tokenInput" rows="3" placeholder="粘贴 userToken…"></textarea>
+      <div class="modal-actions">
+        <button id="tokenSave" type="button">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask hidden" id="hourlyModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="hourlyTitle">分时明细</h3>
+        <button id="hourlyClose" class="modal-close" type="button">×</button>
+      </div>
+      <div class="seg" id="hourlyViewSeg">
+        <button data-view="type" class="active">按计费类型</button>
+        <button data-view="model">按模型</button>
+        <button data-view="key">按 API Key</button>
+      </div>
+      <div id="hourlyChart" class="chart chart-modal"></div>
+    </div>
+  </div>
 
   <script src="echarts.min.js"></script>
   <script src="usage.js"></script>

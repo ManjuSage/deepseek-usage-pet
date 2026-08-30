@@ -19,7 +19,7 @@
 |---|---|---|
 | Electron | `^39.0.0` | 无 `node:sqlite` |
 | SQLite 驱动 | `sql.js`（WASM） | better-sqlite3 因 NAPI/编译问题不可用 |
-| 图表 | ECharts（`renderer/echarts.min.js`） | 复用 33March7/deepseek-api-usage-statistics |
+| 图表 | ECharts（`renderer/echarts.min.js`） | 复用 33March7/deepseek-api-usage-statistics（Unlicense） |
 | 语言 | 原生 JS（无框架/打包器） | `npm start` 直接跑 |
 
 ## 3. 数据源（2 个）
@@ -64,7 +64,7 @@ meta(key, value)                                                          -- 账
 1. **桌宠**：余额气泡、拖拽、Q 弹、点击穿透（setShape）、低余额提醒、随机台词、峰谷提示、闲置半透明。
 2. **托盘**：显示/隐藏勾选、立即刷新、打开设置、用量统计、开机自启、退出。
 3. **设置**：API Key、平台令牌（自动登录）、外观/文案/音效/图片/台词。
-4. **用量统计**：历史回填、近 7/30/90/365 天或自定义日期、日级堆叠图 + 分时下钻、充值余额卡片、上次同步时间。
+4. **用量统计**：历史回填、近 7/30/90/365 天或自定义日期、每日用量走势（按模型/按计费类型/按 API Key，支持 Tokens/费用切换）+ 各模型占比饼图 + 累计趋势 + 用量热力图 + 分时下钻（弹窗）、充值余额卡片、上次同步时间（GMT+8）。
 
 ## 6. 关键决策
 

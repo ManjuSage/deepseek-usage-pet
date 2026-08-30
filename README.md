@@ -4,7 +4,7 @@
 
 一只透明的桌面小鲸鱼，随时显示你的 DeepSeek **余额**与**今日消耗**，并内置**用量统计面板**（日级/分时图表、历史回填、充值余额、上次同步时间）。
 
-基于 [momo-OwO-qwq/DeepSeek-Whale-Pet](https://github.com/momo-OwO-qwq/DeepSeek-Whale-Pet)（MIT）二次开发的独立改版项目，已与原项目分离。其中**用量统计功能**参照 [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics) 实现。
+基于 [momo-OwO-qwq/DeepSeek-Whale-Pet](https://github.com/momo-OwO-qwq/DeepSeek-Whale-Pet)（MIT）二次开发的独立改版项目，已与原项目分离。其中**用量统计功能**参照 [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics)（Unlicense）实现。
 
 ## 特性
 
@@ -30,14 +30,15 @@
 ### 用量统计（新增）
 
 - 历史日级回填：用平台令牌从官网尽量回溯全部历史用量（30 天一段，遇连续空段停止）
-- 日级堆叠图（按类型）+ 点击柱子下钻 24 小时分时
+- 每日用量走势：按模型 / 按计费类型 / 按 API Key 三种拆分，并支持 **Tokens / 费用** 两种指标切换；点击柱子下钻 24 小时分时明细（弹窗）
+- 各模型占比（饼图）、累计趋势、用量热力图：均支持 Tokens / 费用切换，并跟随当前日期范围
 - 分时数据本地累积：每次同步保存「今昨」分时，日积月累可看更早分时（突破平台「只保留两天」的限制）
 - 图表图例可交互：点击图例项（如「缓存命中 / 缓存未命中 / 输出 / 费用」）可**隐藏该项**，只看其余数据，再次点击恢复
 - 范围选择：近 7 / 30 / 90 / 365 天 + 自定义日期
 - 顶部卡片：总 tokens / 缓存命中 / 未命中 / 输出 / 请求次数 / 累计费用 / **充值余额**
 - 启动自动同步：配置令牌后，启动及运行期间自动补同步（每小时检查、超 12h 轻量同步），可在设置关闭
 - 同步进度与取消：历史回填会显示进度（「回填到 YYYY-MM-DD」），可中途取消
-- 显示**上次同步时间**
+- 显示**上次同步时间**（GMT+8）
 
 ## 快速开始
 
@@ -153,4 +154,4 @@ MIT License，见 [LICENSE](LICENSE)。鲸鱼素材与音效沿用原项目。
 
 - [MeteorNOX/DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)（MIT）：DSH Web 插件，鲸鱼余额挂件的原始来源
 - [momo-OwO-qwq/DeepSeek-Whale-Pet](https://github.com/momo-OwO-qwq/DeepSeek-Whale-Pet)（MIT）：基于上述挂件实现的独立桌宠版，本项目在此基础上改版
-- [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics)：用量统计的私有接口与存储 schema
+- [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics)（Unlicense）：用量统计的私有接口与存储 schema

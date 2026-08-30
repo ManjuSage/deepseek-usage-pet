@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   // 用量统计
   getUsageSummary: () => ipcRenderer.invoke('usage:summary'),
   getUsageDaily: (start, end) => ipcRenderer.invoke('usage:daily', { start, end }),
-  getUsageHourly: (day) => ipcRenderer.invoke('usage:hourly', { day }),
+  getUsageHourly: (day, dim) => ipcRenderer.invoke('usage:hourly', { day, dim }),
   syncUsage: () => ipcRenderer.invoke('usage:sync'),
   cancelSync: () => ipcRenderer.invoke('usage:cancel-sync'),
   platformLogin: () => ipcRenderer.invoke('platform:login'),
