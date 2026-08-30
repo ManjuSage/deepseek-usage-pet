@@ -295,11 +295,11 @@ function broadcast(channel, payload) {
 }
 
 // 用量同步：调用平台私有用量接口（amount/cost + 分时），落库。需 platformToken。
-async function syncUsage() {
+async function syncUsage(onProgress) {
   const cfg = configMod.getEffective()
   if (!cfg.platformToken) return { ok: false, error: '未配置平台令牌（DEEPSEEK_PLATFORM_TOKEN）' }
   try {
-    const r = await usageMod.syncAll(cfg.platformToken)
+    const r = await usageMod.syncAll(cfg.platformToken, onProgress)
     return { ok: true, ...r }
   } catch (err) {
     return {
@@ -617,7 +617,16 @@ function registerIpc() {
   })
 
   // ---------- 用量同步 ----------
-  ipcMain.handle('usage:sync', () => syncUsage())
+  ipcMain.handle('usage:sync', (e) => {
+    const sender = e.sender
+    return syncUsage((progress) => {
+      if (sender && !sender.isDestroyed()) sender.send('usage:sync-progress', progress)
+    })
+  })
+  ipcMain.handle('usage:cancel-sync', () => {
+    usageMod.cancelSync()
+    return { ok: true }
+  })
 
   // ---------- 用量面板查询 ----------
   ipcMain.handle('usage:summary', () => {

@@ -6,6 +6,7 @@
   var api = window.whaleAPI
   var dailyChart = null
   var hourlyChart = null
+  var feeVisible = true // 分时图「费用」是否显示（跨日期保持用户选择）
 
   // GMT+8 日期字符串（offsetDays 相对今天偏移），与后端 usage-sync 的日分桶口径一致。
   function gmt8Date(offsetDays) {
@@ -81,12 +82,12 @@
     var hours = detail.hours.map(function (h) { return String(h.hour).padStart(2, '0') + ':00' })
     var option = {
       tooltip: { trigger: 'axis' },
-      legend: { data: ['缓存命中', '缓存未命中', '输出', '费用'] },
+      legend: { data: ['缓存命中', '缓存未命中', '输出', '费用'], selected: { '费用': feeVisible } },
       grid: { left: 8, right: 8, top: 40, bottom: 40, containLabel: true },
       xAxis: { type: 'category', data: hours },
       yAxis: [
         { type: 'value', name: 'tokens' },
-        { type: 'value', name: '费用(¥)' },
+        { type: 'value', name: '费用(¥)', show: feeVisible },
       ],
       series: [
         { name: '缓存命中', type: 'bar', stack: 't', data: detail.hours.map(function (h) { return h.cache_hit }) },
@@ -95,7 +96,14 @@
         { name: '费用', type: 'line', yAxisIndex: 1, data: detail.hours.map(function (h) { return Math.round((h.cost || 0) * 1e4) / 1e4 }) },
       ],
     }
-    if (!hourlyChart) hourlyChart = echarts.init(document.getElementById('hourlyChart'))
+    if (!hourlyChart) {
+      hourlyChart = echarts.init(document.getElementById('hourlyChart'))
+      // 点击图例隐藏/显示「费用」时，同步隐藏/显示右侧「费用(¥)」坐标轴，避免残留文字并向右溢出
+      hourlyChart.on('legendselectchanged', function (params) {
+        feeVisible = !params.selected || params.selected['费用'] !== false
+        hourlyChart.setOption({ yAxis: [{ show: true }, { show: feeVisible }] })
+      })
+    }
     hourlyChart.setOption(option)
   }
 
@@ -142,8 +150,10 @@
 
   async function doSync() {
     var btn = document.getElementById('syncBtn')
+    var cancelBtn = document.getElementById('cancelSyncBtn')
     btn.disabled = true
     btn.textContent = '同步中…'
+    if (cancelBtn) { cancelBtn.style.display = ''; cancelBtn.disabled = false; cancelBtn.textContent = '取消同步' }
     try {
       var r = await api.syncUsage()
       btn.textContent = r.ok ? '已同步' : '同步失败'
@@ -151,6 +161,7 @@
     } catch (e) {
       btn.textContent = '同步失败'
     } finally {
+      if (cancelBtn) cancelBtn.style.display = 'none'
       setTimeout(function () { btn.disabled = false; btn.textContent = '立即同步' }, 2000)
     }
   }
@@ -194,6 +205,18 @@
 
   document.getElementById('syncBtn').addEventListener('click', doSync)
   document.getElementById('loginBtn').addEventListener('click', doLogin)
+  var cancelSyncBtn = document.getElementById('cancelSyncBtn')
+  if (cancelSyncBtn) {
+    cancelSyncBtn.addEventListener('click', function () {
+      api.cancelSync()
+      cancelSyncBtn.disabled = true
+      cancelSyncBtn.textContent = '正在取消…'
+    })
+  }
+  api.onSyncProgress(function (p) {
+    var btn = document.getElementById('syncBtn')
+    if (p && p.startDate) btn.textContent = '同步中… 回填到 ' + p.startDate
+  })
   document.getElementById('tokenSave').addEventListener('click', doSaveToken)
   var presetBtns = Array.prototype.slice.call(document.querySelectorAll('.preset-btn'))
   var rangeStart = document.getElementById('rangeStart')

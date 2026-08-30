@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   getUsageDaily: (start, end) => ipcRenderer.invoke('usage:daily', { start, end }),
   getUsageHourly: (day) => ipcRenderer.invoke('usage:hourly', { day }),
   syncUsage: () => ipcRenderer.invoke('usage:sync'),
+  cancelSync: () => ipcRenderer.invoke('usage:cancel-sync'),
   platformLogin: () => ipcRenderer.invoke('platform:login'),
   // 窗口
   getWorkArea: () => ipcRenderer.invoke('window:get-workarea'),
@@ -46,5 +47,6 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   // 事件
   onConfigChanged: (cb) => ipcRenderer.on('config:changed', (_e, cfg) => cb(cfg)),
   onCustomChanged: (cb) => ipcRenderer.on('custom:changed', (_e, data) => cb(data)),
+  onSyncProgress: (cb) => ipcRenderer.on('usage:sync-progress', (_e, data) => cb(data)),
   onRefresh: (cb) => ipcRenderer.on('whale:refresh', () => cb()),
 })

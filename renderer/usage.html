@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; connect-src 'none'">
   <title>DeepSeek 用量统计</title>
   <link rel="stylesheet" href="usage.css">
 </head>
@@ -12,6 +12,7 @@
     <div class="actions">
       <button id="loginBtn" type="button" class="ghost">登录平台获取令牌</button>
       <button id="syncBtn" type="button">立即同步</button>
+      <button id="cancelSyncBtn" type="button" class="ghost" style="display:none">取消同步</button>
     </div>
   </header>
 

@@ -54,6 +54,7 @@ test('priceFor: 模型匹配与默认回落', () => {
   assert.strictEqual(bal.priceFor('deepseek-v4-flash'), bal.BASE_PRICE)
   assert.strictEqual(bal.priceFor('deepseek-v4-pro'), bal.PRO_PRICE)
   assert.strictEqual(bal.priceFor('deepseek-chat'), bal.BASE_PRICE)
+  assert.strictEqual(bal.priceFor('deepseek-chat & deepseek-reasoner'), bal.BASE_PRICE)
   assert.strictEqual(bal.priceFor('unknown-model-xyz'), bal.BASE_PRICE)
   assert.strictEqual(bal.priceFor(''), bal.BASE_PRICE)
 })

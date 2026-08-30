@@ -1,7 +1,7 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-08-29
+> 更新日期：2026-08-30
 
 ## 1. 项目定位
 
@@ -17,7 +17,7 @@
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| Electron | `^34.0.0`（内置 Node 20.18.1） | 无 `node:sqlite` |
+| Electron | `^39.0.0` | 无 `node:sqlite` |
 | SQLite 驱动 | `sql.js`（WASM） | better-sqlite3 因 NAPI/编译问题不可用 |
 | 图表 | ECharts（`renderer/echarts.min.js`） | 复用 33March7/deepseek-api-usage-statistics |
 | 语言 | 原生 JS（无框架/打包器） | `npm start` 直接跑 |
@@ -68,19 +68,24 @@ meta(key, value)                                                          -- 账
 
 ## 6. 关键决策
 
-1. **sql.js 而非 better-sqlite3**：NAPI 10 vs Node 20.18 不兼容，且本机缺 ClangCL 编译失败。
+1. **sql.js 而非 better-sqlite3**：better-sqlite3 原生模块有 NAPI 兼容问题，且本机缺 ClangCL 编译失败。
 2. **`setShape` 传 `{x,y,width,height}` 整数**：传 `{w,h}` 或浮点会使 shape 无效、全窗口拦截鼠标。
 3. **平台令牌**：登录窗自动提取（localStorage `userToken` 等）+ 手动粘贴兜底。
 4. **历史回填**：30 天一段往回回溯，遇连续两段空即停。
 5. **移除「每轮花费」**：DeepSeek 明示「数据可能有 5 分钟延迟」，余额差值无法精确到单轮。
 6. **`disableHardwareAcceleration`**：图形简单，软件渲染省约 260MB。
 7. **范围选择**：近 7 天默认 + 30/90/365 + 自定义日期（预设按钮 + 始终可见的日期输入框）。
+8. **记账对账取大**：配置平台令牌时，记账模式每次刷新取「余额差值 vs 平台今日用量」较大值。
+9. **启动自动同步**：启动 + 每小时检查，超 12h 做一次轻量同步（不含历史回填），`autoSync` 可关。
+10. **SQLite 批量落盘**：`beginBatch()/flush()` 让一次同步只落盘一次。
+11. **模型定价精确匹配**：未知模型走默认价；平台把旧版 chat/reasoner 合并为 `deepseek-chat & deepseek-reasoner`。
+12. **安全加固与 CSP 收紧**：密钥掩码、openPath 白名单、登录窗护栏、raw 留存上限、三页 `object-src/base-uri/connect-src 'none'`。
 
 ## 7. 风险与缓解
 
 - 私有接口无文档、可能变动、token 过期：原始响应存档 + 结构变化报错 + 降级。
 - 账号混数据：账号指纹检测。
-- 分时限制：更早日期无分时（面板提示「无分时数据」）。
+- 分时限制：平台只保留今昨，但本地会累积保存；未在窗口内同步过的日期无分时（面板提示「无保存的分时数据」）。
 
 ## 8. 目录结构
 
@@ -100,3 +105,4 @@ DeepseekAPIUsagePet/
 - 安装包配置见 `package.json` 的 `build.nsis`：向导式（`oneClick:false`）、安装范围可选（`perMachine:false`）、可选安装目录、中文语言包（`zh_CN` / `en_US`）、桌面 + 开始菜单快捷方式。
 - 输出目录：`dist/installer/`（安装包）、`dist/portable/`（便携版 exe + zip + win-unpacked）。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，不阻塞运行（更多信息 → 仍要运行）。
+- electron-builder 26 的部分二进制 npmmirror 可能缺失，需从 GitHub 手动下载到 `%LOCALAPPDATA%\electron-builder\Cache`。

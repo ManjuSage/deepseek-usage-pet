@@ -8,7 +8,7 @@
 
 ## 技术栈
 
-- Electron `^34.0.0`（内置 Node 20.18.1，Chromium 132）
+- Electron `^39.0.0`
 - 原生 JS（无框架、无打包器），`npm start` 直接跑
 - **sql.js**（WASM 版 SQLite，避免原生模块编译/ABI 问题）
 - ECharts（用量面板图表，`renderer/echarts.min.js`）
@@ -50,13 +50,19 @@ test/               单元测试（node --test）
 
 ## 关键决策与踩坑（务必先读）
 
-1. **用 sql.js 而不是 better-sqlite3**：better-sqlite3 v13 用 NAPI 10，需 Node≥22；Electron 34 内置 Node 20.18 只支持 NAPI 9，不兼容；降版本又因本机缺 ClangCL 编译失败。sql.js 是 WASM，零编译零 ABI 问题。
+1. **用 sql.js 而不是 better-sqlite3**：better-sqlite3 原生模块有 NAPI 版本兼容问题，且本机缺 ClangCL 编译失败。sql.js 是 WASM，零编译零 ABI 问题。
 2. **`setShape` 必须传 `{x, y, width, height}` 且为整数**：传 `{w,h}` 或浮点会导致 shape 无效，整个窗口拦截鼠标（透明区「失效」）。见 `main.js sanitizeRects()`。
 3. **气泡淡出后再裁剪窗口**：`hideBubble()` 里延迟 520ms 再 `reportShape()`，否则气泡被矩形边界硬切。
-4. **分时数据平台只保留今天+昨天**：更早日期无分时，用量面板会提示「无分时数据」。
+4. **分时数据平台只保留今天+昨天**：程序每次同步把「今昨」分时 upsert 进 SQLite 并持续累积，面板能显示已累积的更早分时（前提是该日期在两天窗口内同步过）；没存到的日期才提示「无保存的分时数据」。
 5. **「每轮花费」已移除**：DeepSeek 官网明示「数据可能有 5 分钟延迟」，余额差值无法精确到单轮，故该功能及 `turn_ledger`、`notify-bridge` 均已删除。
 6. **`app.disableHardwareAcceleration()`**：桌宠图形简单，禁用硬件加速省约 260MB 内存（GPU 进程从 ~317MB 降到 ~54MB）。
 7. **GMT+8**：平台用量按 GMT+8 分日桶，所有日期计算统一用 `TZ_OFFSET_SEC = 8*3600`（`lib/usage-sync.js`）。
+8. **记账模式「对账取大」**：配置了平台令牌时，记账模式每次刷新用「余额差值 vs 平台今日用量」取较大值，补齐未运行期间的花费；未配令牌则只有余额差值（会漏掉当天首次启动前已产生的花费）。
+9. **启动自动同步**：启动时 + 每小时检查一次，距上次同步超 12h 且配置令牌就做一次「轻量同步」（近两天日级 + 今昨分时 + 余额，不含历史回填）；设置里 `autoSync` 可开关。
+10. **SQLite 批量落盘**：`store.beginBatch()/flush()` 让一次同步只全库导出落盘一次，避免每行写都 export。
+11. **模型定价精确匹配**：`priceFor` 精确匹配，未知模型走默认价并打英文日志（避免 GBK 终端乱码）。注意平台会把旧版 chat/reasoner 合并成 `deepseek-chat & deepseek-reasoner` 一个名字。
+12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。
+13. **CSP 收紧**：pet/menu/usage 三页补 `object-src 'none'; base-uri 'none'; connect-src 'none'`。
 
 ## 打包与分发
 
@@ -65,6 +71,7 @@ test/               单元测试（node --test）
 - 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + zip + win-unpacked）。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，需用户点「更多信息 → 仍要运行」。
 - 打包联网下载 NSIS 工具链 / Electron 用 npmmirror 镜像（直接 GitHub 可能失败）。
+- electron-builder 26 需要下载 `icons` / `nsis` / `7zip` / `nsis-resources` 等二进制，npmmirror 镜像可能缺（404），需从 GitHub 手动下载放进 `%LOCALAPPDATA%\electron-builder\Cache`。
 
 ## 常用命令
 
