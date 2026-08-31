@@ -36,7 +36,7 @@ test/               单元测试（node --test）
 ## 功能
 
 - **桌宠**：透明置顶、点击穿透（setShape 只保留鲸鱼/气泡/按钮）、拖拽、Q 弹、低余额提醒、随机台词、峰谷提示
-- **托盘**：「显示鲸鱼」勾选状态、立即刷新、打开设置、用量统计、开机自启、退出
+- **托盘**：「显示鲸鱼」「鼠标穿透」勾选状态、立即刷新、打开设置、用量统计、开机自启、退出
 - **设置**：API Key、平台令牌（自动登录提取）、主题、大小、音效、图片、台词等
 - **用量统计**：历史日级回填、近 7/30/90/365 天或自定义日期、每日用量走势（按模型/按计费类型/按 API Key，且支持 Tokens/费用切换）+ 各模型占比饼图 + 累计趋势 + 用量热力图 + 点击看分时明细（弹窗）、充值余额卡片、上次同步时间（GMT+8）
 
@@ -63,6 +63,7 @@ test/               单元测试（node --test）
 11. **模型定价精确匹配**：`priceFor` 精确匹配，未知模型走默认价并打英文日志（避免 GBK 终端乱码）。注意平台会把旧版 chat/reasoner 合并成 `deepseek-chat & deepseek-reasoner` 一个名字。
 12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。
 13. **CSP 收紧**：pet/menu/usage 三页补 `object-src 'none'; base-uri 'none'; connect-src 'none'`。
+14. **鼠标穿透的平台差异**：Windows/macOS 用 `setIgnoreMouseEvents(true/false)`；Linux/X11 用 `setShape([])`（空 shape）穿透、关闭时恢复 `lastShapeRects`。**Wayland/XWayland 下两者都不可靠**（事件转发、光标位置有已知问题），需用户改回 X11 会话才能用。
 
 ## 打包与分发
 

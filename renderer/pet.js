@@ -138,6 +138,7 @@
   var bubbleIntervalMs = 900000
   var bubbleIntervalTimer = null
   var idleFade = true
+  var passthrough = false
   var refreshIntervalMs = 60000
   var threshold = 10
   var alertImage = false
@@ -329,7 +330,7 @@
   }
 
   function showBubble() {
-    if (!bubbleOn) return
+    if (!bubbleOn || passthrough) return
     if (bubbleTimer) { clearTimeout(bubbleTimer); bubbleTimer = null }
     if (gifFadeTimer) { clearTimeout(gifFadeTimer); gifFadeTimer = null }
     bubbleShown = true
@@ -344,7 +345,7 @@
   // 点击气泡切换/关闭行为不变；自动触发时直接展示随机台词段。
   function showRandomBubble() {
     // 守卫：关闭气泡、拖拽中、已有气泡展开（用户正在看）时不打断自动弹出
-    if (!bubbleOn) return
+    if (!bubbleOn || passthrough) return
     if (bubbleShown) return
     if (drag && drag.active) return
     if (state.status === 'error') return // 出错时不打扰
@@ -527,11 +528,13 @@
               if (state.status === 'changing') { state.status = 'ok'; render() }
             }, CHANGE_MS + 300)
           } else {
+            showBubble()
             animateAmount(shown, nb, nc, ANIM_MS)
             state.status = 'ok'
             render()
           }
         } else {
+          if (manual) showBubble()
           if (animId === null) shown = nb
           state.status = 'ok'
           render()
@@ -933,7 +936,21 @@
   }
 
   // ------------------------------------------------------------- 闲置半透明
+  function applyPassthroughState(enabled) {
+    passthrough = !!enabled
+    if (passthrough) {
+      hideBubble()
+      root.classList.add('wp-idle')
+    } else {
+      root.classList.remove('wp-idle')
+    }
+  }
+
   function checkIdle() {
+    if (passthrough) {
+      root.classList.add('wp-idle')
+      return
+    }
     if (!idleFade || (drag && drag.active)) {
       root.classList.remove('wp-idle')
       return
@@ -956,6 +973,7 @@
       if (bubbleIntervalMs > 0) bubbleIntervalTimer = setInterval(function () { showRandomBubble() }, bubbleIntervalMs)
     }
     idleFade = c.idleFade !== false
+    applyPassthroughState(c.passthrough === true)
     // 闲置不透明度（可调，0.2 - 1.0）
     var idleOp = (typeof c.idleOpacity === 'number' && isFinite(c.idleOpacity)) ? Math.min(1, Math.max(0.2, c.idleOpacity)) : 0.6
     root.style.setProperty('--wp-idle-opacity', String(idleOp))
@@ -991,6 +1009,7 @@
   api.onConfigChanged(function (c) { applyConfig(c, false) })
   api.onCustomChanged(function (data) { applyCustom(data) })
   api.onRefresh(function () { refresh(true) })
+  api.onPassthrough(function (enabled) { applyPassthroughState(enabled) })
 
   // ------------------------------------------------------------- 启动
   async function init() {

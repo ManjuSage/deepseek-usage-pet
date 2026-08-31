@@ -38,6 +38,25 @@
     feeVisible: true,
   }
   var charts = {}
+  function detectDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+  function buildTheme(dark) {
+    return {
+      ink: dark ? '#e6edf3' : '#1f2328',
+      muted: dark ? '#8b949e' : '#6b7280',
+      border: dark ? '#2d333b' : '#e5e7eb',
+      panel: dark ? '#1b2026' : '#ffffff',
+      heatColors: dark ? ['#151b23', '#0e4429', '#006d32', '#26a641', '#39d353'] : ['#eff2f5', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
+    }
+  }
+  var T = buildTheme(detectDark())
+  function tooltipCfg(o) {
+    o.backgroundColor = T.panel
+    o.borderColor = T.border
+    o.textStyle = { color: T.ink }
+    return o
+  }
 
   function gmt8Date(offsetDays) {
     return new Date(Date.now() + 8 * 3600 * 1000 + offsetDays * 86400 * 1000).toISOString().slice(0, 10)
@@ -86,7 +105,7 @@
     return charts[id]
   }
   function emptyOption(text) {
-    return { title: { text: text, left: 'center', top: 'middle', textStyle: { color: '#9aa4b2', fontSize: 13, fontWeight: 'normal' } } }
+    return { title: { text: text, left: 'center', top: 'middle', textStyle: { color: T.muted, fontSize: 13, fontWeight: 'normal' } } }
   }
 
   function renderSummary(s, balance) {
@@ -158,20 +177,23 @@
       })
     }
 
-    var tooltip = { trigger: 'axis', confine: true, axisPointer: { type: 'shadow' } }
+    var tooltip = tooltipCfg({ trigger: 'axis', confine: true, axisPointer: { type: 'shadow' } })
     if (isCost) tooltip.valueFormatter = fmtCost
     chart.setOption({
       tooltip: tooltip,
-      legend: { type: view === 'type' ? 'plain' : 'scroll', top: 0 },
+      legend: { type: view === 'type' ? 'plain' : 'scroll', top: 0, textStyle: { color: T.muted } },
       grid: { left: 8, right: 12, top: 32, bottom: 32, containLabel: true },
-      xAxis: { type: 'category', data: dates },
-      yAxis: { type: 'value', name: isCost ? '费用(¥)' : 'tokens', axisLabel: { formatter: isCost ? function (v) { return '¥' + v } : fmtTokens } },
+      xAxis: { type: 'category', data: dates, axisLabel: { color: T.muted }, axisLine: { lineStyle: { color: T.border } }, axisTick: { lineStyle: { color: T.border } } },
+      yAxis: { type: 'value', name: isCost ? '费用(¥)' : 'tokens', nameTextStyle: { color: T.muted }, axisLabel: { color: T.muted, formatter: isCost ? function (v) { return '¥' + v } : fmtTokens }, splitLine: { lineStyle: { color: T.border } } },
       series: series,
     }, true)
     chart.off('click')
     chart.on('click', function (p) {
       var dt = dates[p.dataIndex]
-      if (dt) loadHourly(dt)
+      if (dt) {
+        setHourlyView(state.dailyView)
+        loadHourly(dt)
+      }
     })
   }
 
@@ -191,9 +213,9 @@
     if (!items.length) { chart.setOption(emptyOption('暂无数据'), true); return }
     var total = items.reduce(function (s, x) { return s + x.value }, 0)
     chart.setOption({
-      title: { text: isCost ? fmtMoneyShort(total) : fmtTokens(total), left: 'center', top: 'middle', textStyle: { fontSize: 14, fontWeight: 600 } },
-      tooltip: { trigger: 'item', confine: true, formatter: function (p) { return p.marker + ' ' + p.name + '<br/>' + (isCost ? fmtCost(p.value) : fmtTokensFull(p.value) + ' tokens') + ' (' + p.percent + '%)' } },
-      legend: { type: 'plain', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
+      title: { text: isCost ? fmtMoneyShort(total) : fmtTokens(total), left: 'center', top: 'middle', textStyle: { color: T.ink, fontSize: 14, fontWeight: 600 } },
+      tooltip: tooltipCfg({ trigger: 'item', confine: true, formatter: function (p) { return p.marker + ' ' + p.name + '<br/>' + (isCost ? fmtCost(p.value) : fmtTokensFull(p.value) + ' tokens') + ' (' + p.percent + '%)' } }),
+      legend: { type: 'plain', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { color: T.muted, fontSize: 11 } },
       series: [{
         type: 'pie', radius: ['40%', '72%'], center: ['50%', '50%'],
         label: { show: false },
@@ -218,10 +240,10 @@
     var last = 0
     var data = dates.map(function (dt) { if (byDate[dt] !== undefined) last += byDate[dt]; return last })
     chart.setOption({
-      tooltip: { trigger: 'axis', confine: true, valueFormatter: isCost ? fmtCost : undefined },
+      tooltip: tooltipCfg({ trigger: 'axis', confine: true, valueFormatter: isCost ? fmtCost : undefined }),
       grid: { left: 8, right: 12, top: 28, bottom: 30, containLabel: true },
-      xAxis: { type: 'category', data: dates, boundaryGap: false },
-      yAxis: { type: 'value', axisLabel: { formatter: function (v) { return isCost ? '¥' + v : fmtTokens(v) } } },
+      xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { color: T.muted }, axisLine: { lineStyle: { color: T.border } }, axisTick: { lineStyle: { color: T.border } } },
+      yAxis: { type: 'value', axisLabel: { color: T.muted, formatter: function (v) { return isCost ? '¥' + v : fmtTokens(v) } }, splitLine: { lineStyle: { color: T.border } } },
       series: [{
         name: isCost ? '累计花费' : '累计 Tokens',
         type: 'line', smooth: false, showSymbol: false,
@@ -243,14 +265,16 @@
     } else {
       ;(d.totals || []).forEach(function (r) { byDate[r.utc_date] = (r.cache_hit || 0) + (r.cache_miss || 0) + (r.output || 0) })
     }
-    var data = Object.keys(byDate).map(function (dt) { return [dt, byDate[dt]] })
-    if (!data.length) { chart.setOption(emptyOption('暂无数据'), true); return }
-    var max = Math.max.apply(null, data.map(function (x) { return x[1] }))
+    var hasData = Object.keys(byDate).length > 0
+    if (!hasData) { chart.setOption(emptyOption('暂无数据'), true); return }
+    var max = Math.max.apply(null, Object.keys(byDate).map(function (dt) { return byDate[dt] }))
+    var data = genDateRange(r.start, r.end).map(function (dt) { return [dt, byDate[dt] || 0] })
+    var gapColor = T.panel
     chart.setOption({
-      tooltip: { position: 'top', confine: true, formatter: function (p) { return p.value[0] + '<br/>' + (isCost ? fmtCost(p.value[1]) : fmtTokensFull(p.value[1]) + ' tokens') } },
-      visualMap: { min: 0, max: max, show: false, inRange: { color: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'] } },
-      calendar: { range: [r.start, r.end], cellSize: ['auto', 16], yearLabel: { show: false }, dayLabel: { firstDay: 1 }, monthLabel: { nameMap: 'ZH' }, splitLine: { show: false } },
-      series: [{ type: 'heatmap', coordinateSystem: 'calendar', data: data }],
+      tooltip: tooltipCfg({ position: 'top', confine: true, formatter: function (p) { return p.value[0] + '<br/>' + (isCost ? fmtCost(p.value[1]) : fmtTokensFull(p.value[1]) + ' tokens') } }),
+      visualMap: { min: 0, max: max, show: false, inRange: { color: T.heatColors } },
+      calendar: { range: [r.start, r.end], cellSize: 16, left: 'center', top: 'middle', itemStyle: { borderWidth: 0, color: T.panel }, yearLabel: { show: false }, dayLabel: { color: T.muted, firstDay: 1 }, monthLabel: { color: T.muted, nameMap: 'ZH' }, splitLine: { show: false } },
+      series: [{ type: 'heatmap', coordinateSystem: 'calendar', itemStyle: { borderWidth: 2, borderColor: gapColor, borderRadius: 3 }, data: data }],
     }, true)
   }
 
@@ -275,9 +299,8 @@
     })
     series.push({ name: '费用', type: 'line', yAxisIndex: 1, data: (detail.cost || []).map(function (c) { return Math.round((c || 0) * 1e4) / 1e4 }) })
     chart.setOption({
-      tooltip: {
+      tooltip: tooltipCfg({
         trigger: 'axis',
-        confine: true,
         formatter: function (params) {
           var rows = [params[0].axisValue]
           params.forEach(function (p) {
@@ -285,13 +308,13 @@
           })
           return rows.join('<br/>')
         },
-      },
-      legend: { type: 'scroll', top: 0, selected: { '费用': state.feeVisible } },
+      }),
+      legend: { type: 'scroll', top: 0, textStyle: { color: T.muted }, selected: { '费用': state.feeVisible } },
       grid: { left: 8, right: 8, top: 32, bottom: 32, containLabel: true },
-      xAxis: { type: 'category', data: hours },
+      xAxis: { type: 'category', data: hours, axisLabel: { color: T.muted }, axisLine: { lineStyle: { color: T.border } }, axisTick: { lineStyle: { color: T.border } } },
       yAxis: [
-        { type: 'value', name: 'tokens', axisLabel: { formatter: fmtTokens } },
-        { type: 'value', name: '费用(¥)', show: state.feeVisible },
+        { type: 'value', name: 'tokens', nameTextStyle: { color: T.muted }, axisLabel: { color: T.muted, formatter: fmtTokens }, splitLine: { lineStyle: { color: T.border } } },
+        { type: 'value', name: '费用(¥)', nameTextStyle: { color: T.muted }, axisLabel: { color: T.muted }, splitLine: { show: false }, show: state.feeVisible },
       ],
       series: series,
     }, true)
@@ -329,10 +352,20 @@
     requestAnimationFrame(function () { resizeAllCharts() })
   }
 
+  function setHourlyView(value) {
+    state.hourlyView = value
+    var box = document.getElementById('hourlyViewSeg')
+    if (!box) return
+    Array.prototype.slice.call(box.querySelectorAll('button')).forEach(function (b) {
+      b.classList.toggle('active', b.dataset.view === value)
+    })
+  }
+
   async function loadHourly(day) {
     state.hourlyDate = day
     showHourlyModal() // 先显示弹窗，确保容器可见，避免 ECharts 在隐藏容器上初始化出 0 尺寸
     var detail = await api.getUsageHourly(day, state.hourlyView)
+    state.hourlyDetail = detail
     renderHourly(detail)
   }
 
@@ -487,6 +520,21 @@
     chartContainerIds.forEach(function (id) {
       var el = document.getElementById(id)
       if (el) resizeObserver.observe(el)
+    })
+  }
+  function renderAll() {
+    if (state.daily) {
+      renderDaily()
+      renderModels()
+      renderCumulative()
+    }
+    if (state.heatmapData) renderHeatmap()
+    if (state.hourlyDetail) renderHourly(state.hourlyDetail)
+  }
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+      T = buildTheme(detectDark())
+      renderAll()
     })
   }
   loadSummary().catch(function (e) { console.error(e) })

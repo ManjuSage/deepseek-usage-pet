@@ -180,7 +180,7 @@ html, body {
 /* 汉堡菜单按钮（悬停鲸鱼时出现；点击打开设置窗口） */
 .wp-menu-btn {
   position: absolute;
-  top: calc(40.55% + 4px);
+  top: 35%;
   right: 4px;
   width: 26px;
   height: 26px;

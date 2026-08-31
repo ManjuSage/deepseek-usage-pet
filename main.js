@@ -37,6 +37,8 @@ let tray = null
 let balanceService = null
 let dragState = null
 let lastLowNotifyAt = 0
+let passthroughActive = false
+let lastShapeRects = null
 
 // 拖拽引擎（主进程持有唯一权威）：
 //  - 主通道：轮询 screen.getCursorScreenPoint()（真实鼠标移动会更新其事件缓存，
@@ -146,6 +148,7 @@ function createPetWindow() {
   petWin.setAlwaysOnTop(true)
   pinPetWindow(petWin)
   petWin.loadFile(path.join(__dirname, 'renderer', 'pet.html'))
+  applyPassthrough(!!(configMod.getEffective() || {}).passthrough)
   petWin.once('ready-to-show', () => {
     if (!petWin) return
     petWin.showInactive()
@@ -264,9 +267,11 @@ function rebuildTrayMenu() {
   try {
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '显示鲸鱼', type: 'checkbox', checked: !!(petWin && !petWin.isDestroyed() && petWin.isVisible()), click: () => togglePet() },
+      { label: '鼠标穿透', type: 'checkbox', checked: !!cfg.passthrough, click: (item) => setPassthrough(item.checked) },
+      { type: 'separator' },
       { label: '立即刷新余额', click: () => sendRefresh() },
-      { label: '打开设置', click: () => openMenu() },
       { label: '用量统计', click: () => openUsage() },
+      { label: '打开设置', click: () => openMenu() },
       { type: 'separator' },
       { label: '开机自启', type: 'checkbox', checked: !!cfg.autostart, click: (item) => setAutostart(item.checked) },
       { type: 'separator' },
@@ -518,6 +523,33 @@ function setAutostart(enabled) {
   rebuildTrayMenu()
 }
 
+// 鼠标穿透：整窗不再接收鼠标事件（Windows/macOS 用 setIgnoreMouseEvents，
+// Linux/X11 用空 shape 兜底；Wayland 下两者都可能失效，属已知不可靠场景）。
+function applyPassthrough(enabled) {
+  passthroughActive = !!enabled
+  if (!petWin || petWin.isDestroyed()) return
+  if (passthroughActive) {
+    if (process.platform === 'linux') {
+      try { petWin.setShape([]) } catch (err) { /* ignore */ }
+    } else {
+      try { petWin.setIgnoreMouseEvents(true) } catch (err) { /* ignore */ }
+    }
+  } else {
+    if (process.platform === 'linux') {
+      try { petWin.setShape(lastShapeRects || []) } catch (err) { /* ignore */ }
+    } else {
+      try { petWin.setIgnoreMouseEvents(false) } catch (err) { /* ignore */ }
+    }
+  }
+  try { petWin.webContents.send('whale:passthrough', passthroughActive) } catch (err) { /* ignore */ }
+}
+
+function setPassthrough(enabled) {
+  configMod.save({ passthrough: !!enabled })
+  applyPassthrough(!!enabled)
+  rebuildTrayMenu()
+}
+
 // ================================ 低余额通知 ==============================
 function checkLowBalance(payload) {
   if (!payload || !payload.ok) return
@@ -684,6 +716,8 @@ function registerIpc() {
   ipcMain.on('pet:shape', (e, msg) => {
     if (!petWin || petWin.isDestroyed()) return
     const rects = sanitizeRects(msg && msg.rects)
+    lastShapeRects = rects
+    if (passthroughActive) return // 穿透期间保持整窗穿透，忽略渲染层上报的 shape
     if (process.env.WHALE_PET_TRACE === '1') console.log('[trace] shape', JSON.stringify(rects))
     try { petWin.setShape(rects) } catch (err) { /* 个别环境不支持 shape，忽略 */ }
   })

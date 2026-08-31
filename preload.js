@@ -49,4 +49,5 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   onCustomChanged: (cb) => ipcRenderer.on('custom:changed', (_e, data) => cb(data)),
   onSyncProgress: (cb) => ipcRenderer.on('usage:sync-progress', (_e, data) => cb(data)),
   onRefresh: (cb) => ipcRenderer.on('whale:refresh', () => cb()),
+  onPassthrough: (cb) => ipcRenderer.on('whale:passthrough', (_e, enabled) => cb(enabled)),
 })
