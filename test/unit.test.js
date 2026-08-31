@@ -48,6 +48,17 @@ test('isPeakTime: 北京时间边界', () => {
   assert.strictEqual(bal.isPeakTime(null), false)
 })
 
+test('isPeakTime: 周末谷价生效分界（2026-08-23 起）', () => {
+  // t(y,mo,d,h,mi,s) → 北京时间 y-mo-d h:mi:s 的 Unix 秒
+  const t = (y, mo, d, h, mi, s) => Math.floor(new Date(Date.UTC(y, mo, d, h - 8, mi, s)).getTime() / 1000)
+  // 2026-08-22 周六（分界前）：10:00 仍按旧规则算高峰
+  assert.strictEqual(bal.isPeakTime(t(2026, 7, 22, 10, 0, 0)), true, '分界前周六 10:00 高峰')
+  // 2026-08-23 周日（分界当天）：全天低谷
+  assert.strictEqual(bal.isPeakTime(t(2026, 7, 23, 10, 0, 0)), false, '分界当天周日 10:00 低谷')
+  // 2026-08-29 周六（分界后）：全天低谷
+  assert.strictEqual(bal.isPeakTime(t(2026, 7, 29, 10, 0, 0)), false, '分界后周六 10:00 低谷')
+})
+
 // ---------- 定价表 ----------
 test('priceFor: 模型匹配与默认回落', () => {
   assert.strictEqual(bal.priceFor('deepseek-v4-flash-vision-exp'), bal.BASE_PRICE)
@@ -214,6 +225,21 @@ test('ledger: 跨天标记 + seedToday 补录起点且不重复累加', () => {
   // 非正值补录不覆盖已有值
   ledger.seedToday(0)
   assert.strictEqual(ledger.readLedger().todayUsage, 17.5)
+})
+
+test('ledger: 币种切换只换基准、不记差值', () => {
+  for (const f of fs.readdirSync(TEST_HOME)) fs.rmSync(path.join(TEST_HOME, f), { recursive: true, force: true })
+
+  // 同一天：CNY 100 → USD 5（币种切换，只换基准，不把跳变记成消费）
+  ledger.recordBalance(100, 'CNY')
+  let led = ledger.recordBalance(5, 'USD')
+  assert.strictEqual(led.todayUsage, 0, '币种切换不记成消费')
+  assert.strictEqual(led.lastBalance, 5)
+
+  // 之后同币种下降 → 正常累加
+  led = ledger.recordBalance(4, 'USD')
+  assert.strictEqual(led.todayUsage, 1)
+  assert.strictEqual(led.lastBalance, 4)
 })
 
 // ---------- 配置 ----------
