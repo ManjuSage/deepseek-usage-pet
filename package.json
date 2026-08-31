@@ -1,7 +1,7 @@
 {
   "name": "deepseek-usage-pet",
   "productName": "DeepSeek Usage Pet",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "DeepSeek 桌面小鲸鱼桌宠：余额监控 + 用量统计面板（日级/分时图表、历史回填、充值余额、同步时间）",
   "main": "main.js",
   "author": {
@@ -21,7 +21,7 @@
     "test": "node --test",
     "dist": "electron-builder --linux",
     "dist:linux": "electron-builder --linux",
-    "dist:win": "electron-builder --win",
+    "dist:win": "electron-builder --win && node scripts/package-dist.js",
     "dist:mac": "electron-builder --mac",
     "dist:appimage": "electron-builder --linux AppImage",
     "dist:deb": "electron-builder --linux deb"

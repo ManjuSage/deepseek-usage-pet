@@ -43,6 +43,8 @@
 
 ## 快速开始
 
+> 需要 Node.js（含 npm），建议 Node 18 及以上（Electron 39 构建要求）。
+
 ```bash
 cd DeepseekAPIUsagePet
 npm install
@@ -102,12 +104,20 @@ DeepseekAPIUsagePet/
 
 ## 打包与分发
 
-支持两种 Windows 产物，`npm run dist:win` 一次生成（联网下载工具链建议走 npmmirror 镜像，避免直连 GitHub 失败）：
+支持两种 Windows 产物，`npm run dist:win` 一次生成（会自动整理到 installer / portable 目录并生成便携版 zip）：
 
 | 产物 | 位置 | 说明 |
 |---|---|---|
 | 安装包 | `dist/installer/` | NSIS 向导式安装：可选安装目录、可选「仅当前用户 / 所有用户」、中文界面、自动创建桌面与开始菜单快捷方式 |
 | 便携版 | `dist/portable/` | 免安装：单文件 exe + zip（解压即用） |
+
+> 联网下载 Electron / NSIS 工具链时建议走 npmmirror 镜像，避免直连 GitHub 失败：
+>
+> ```powershell
+> $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+> $env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
+> npm run dist:win
+> ```
 
 > 安装包未做代码签名：首次双击时 Windows SmartScreen 会提示「未知发布者」，点「更多信息 → 仍要运行」即可。
 
