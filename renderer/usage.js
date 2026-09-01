@@ -122,9 +122,21 @@
     if (balance && balance.normal) {
       cards.push(['充值余额', fmtMoney(balance.normal.balance, balance.normal.currency)])
     }
-    document.getElementById('summary').innerHTML = cards.map(function (c) {
-      return '<div class="card"><div class="card-label">' + c[0] + '</div><div class="card-value">' + c[1] + '</div></div>'
-    }).join('')
+    var box = document.getElementById('summary')
+    box.textContent = ''
+    cards.forEach(function (c) {
+      var card = document.createElement('div')
+      card.className = 'card'
+      var label = document.createElement('div')
+      label.className = 'card-label'
+      label.textContent = c[0]
+      var value = document.createElement('div')
+      value.className = 'card-value'
+      value.textContent = c[1]
+      card.appendChild(label)
+      card.appendChild(value)
+      box.appendChild(card)
+    })
   }
 
   function renderDaily() {

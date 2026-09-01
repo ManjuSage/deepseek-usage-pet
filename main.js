@@ -291,10 +291,34 @@ function sendRefresh() {
   if (petWin && !petWin.isDestroyed()) petWin.webContents.send('whale:refresh')
 }
 
+// 判断 IPC 来源是否设置窗（menu.html）
+function isMenuSender(e) {
+  return !!(e && e.senderFrame && /menu\.html(?:\?|#|$)/.test(e.senderFrame.url))
+}
+
+// 判断 IPC 来源是否用量面板（usage.html）
+function isUsageSender(e) {
+  return !!(e && e.senderFrame && /usage\.html(?:\?|#|$)/.test(e.senderFrame.url))
+}
+
+// 返回去除密钥的浅拷贝（apiKey / platformToken 置空）
+function maskSecrets(cfg) {
+  const c = { ...cfg }
+  c.apiKey = ''
+  c.platformToken = ''
+  return c
+}
+
 function broadcast(channel, payload) {
   for (const w of [petWin, menuWin]) {
     try {
-      if (w && !w.isDestroyed()) w.webContents.send(channel, payload)
+      if (!w || w.isDestroyed()) continue
+      if (channel === 'config:changed') {
+        // 设置窗收完整配置，鲸鱼/用量窗收掩码后的配置（缩小密钥暴露面）
+        w.webContents.send(channel, w === menuWin ? payload : maskSecrets(payload))
+      } else {
+        w.webContents.send(channel, payload)
+      }
     } catch (err) { /* ignore */ }
   }
 }
@@ -607,8 +631,7 @@ function registerIpc() {
     if (process.env.WHALE_PET_TRACE === '1') console.log('[trace] config:get scale=' + cfg.scale + ' dir=' + configMod.CONFIG_DIR)
     // 仅设置窗（menu.html）返回明文密钥；pet/usage 等其余窗口返回空，缩小密钥暴露面。
     // 是否已配置仍可通过 apiKeySource / platformTokenSource 判断。
-    const isMenu = !!(e && e.senderFrame && /menu\.html(?:\?|#|$)/.test(e.senderFrame.url))
-    if (!isMenu) {
+    if (!isMenuSender(e)) {
       cfg.apiKey = ''
       cfg.platformToken = ''
     }
@@ -625,20 +648,26 @@ function registerIpc() {
   })
 
   ipcMain.handle('config:set', (e, patch) => {
+    // 写权限最小化：apiKey 仅设置窗可写；platformToken 仅设置窗/用量面板可写；
+    // 其余字段所有窗口可写（鲸鱼窗口写 scale/posX/posY 等非敏感字段）。
+    if (hasOwn(patch, 'apiKey') && !isMenuSender(e)) delete patch.apiKey
+    if (hasOwn(patch, 'platformToken') && !isMenuSender(e) && !isUsageSender(e)) delete patch.platformToken
     const next = configMod.save(patch)
-    if (!next) return configMod.getEffective()
-    // 影响余额结果的字段变化 → 使缓存失效，下次立即按新配置计算
-    if (hasOwn(patch, 'apiKey') || hasOwn(patch, 'platformToken') || hasOwn(patch, 'usageMode')) {
-      balanceService.invalidate()
+    if (next) {
+      // 影响余额结果的字段变化 → 使缓存失效，下次立即按新配置计算
+      if (hasOwn(patch, 'apiKey') || hasOwn(patch, 'platformToken') || hasOwn(patch, 'usageMode')) {
+        balanceService.invalidate()
+      }
+      if (hasOwn(patch, 'autostart')) {
+        setAutostart(!!next.autostart)
+      }
+      if (hasOwn(patch, 'theme')) {
+        applyNativeTheme()
+      }
+      broadcast('config:changed', configMod.getEffective())
     }
-    if (hasOwn(patch, 'autostart')) {
-      setAutostart(!!next.autostart)
-    }
-    if (hasOwn(patch, 'theme')) {
-      applyNativeTheme()
-    }
-    broadcast('config:changed', configMod.getEffective())
-    return configMod.getEffective()
+    const effective = configMod.getEffective()
+    return isMenuSender(e) ? effective : maskSecrets(effective)
   })
 
   // ---------- 余额 ----------
@@ -724,8 +753,15 @@ function registerIpc() {
 
   ipcMain.on('window:resize', (e, msg) => {
     if (!petWin || petWin.isDestroyed()) return
-    const w = Math.max(80, Math.round(Number(msg && msg.w) || BASE_PX))
-    const h = Math.max(80, Math.round(Number(msg && msg.h) || BASE_PX))
+    let maxW = 2000
+    let maxH = 2000
+    try {
+      const wa = screen.getPrimaryDisplay().workArea
+      maxW = Math.max(80, wa.width)
+      maxH = Math.max(80, wa.height)
+    } catch (err) { /* 取不到工作区时用保守上限 */ }
+    const w = Math.min(maxW, Math.max(80, Math.round(Number(msg && msg.w) || BASE_PX)))
+    const h = Math.min(maxH, Math.max(80, Math.round(Number(msg && msg.h) || BASE_PX)))
     if (process.env.WHALE_PET_TRACE === '1') console.log('[trace] resize ->', w, h)
     petWin.setSize(w, h)
     // 部分 WM 在 setSize 后会掉置顶层，重新声明
