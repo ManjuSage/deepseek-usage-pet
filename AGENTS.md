@@ -23,6 +23,7 @@ lib/
   config.js         配置读写（%APPDATA%/whale-pet/config.json，env 覆盖）
   ledger.js         「小鲸鱼记账」：余额差值累计今日用量
   lines.js          随机台词池（lines.json）
+  log.js            文件日志（pet.log 轮转 + 终端回显 + 密钥掩码）
   store.js          sql.js 存储层：schema + upsert + 查询
   usage-sync.js     平台私有接口 → 用量回填/分时/余额/账号指纹
 renderer/
@@ -35,9 +36,9 @@ test/               单元测试（node --test）
 
 ## 功能
 
-- **桌宠**：透明置顶、点击穿透（setShape 只保留鲸鱼/气泡/按钮）、拖拽、Q 弹、低余额提醒、随机台词、峰谷提示
+- **桌宠**：透明置顶、点击穿透（setShape 只保留鲸鱼/气泡/按钮）、拖拽、Q 弹、低余额提醒、随机台词、峰谷提示、方向感知镜像（设置可开关）
 - **托盘**：「显示鲸鱼」「鼠标穿透」勾选状态、立即刷新、打开设置、用量统计、开机自启、退出
-- **设置**：API Key、平台令牌（自动登录提取）、主题、大小、音效、图片、台词等
+- **设置**：API Key、平台令牌（自动登录提取）、主题、大小、音效、图片、台词、镜像翻转开关、打开日志
 - **用量统计**：历史日级回填、近 7/30/90/365 天或自定义日期、每日用量走势（按模型/按计费类型/按 API Key，且支持 Tokens/费用切换）+ 各模型占比饼图 + 累计趋势 + 用量热力图 + 点击看分时明细（弹窗）、充值余额卡片、上次同步时间（GMT+8）
 
 ## 数据与存储
@@ -47,6 +48,7 @@ test/               单元测试（node --test）
   - `amount_daily` / `cost_daily`：日级用量/费用
   - `hourly_usage` / `hourly_cost`：分时（平台只保留今天+昨天）
   - `meta`：账号指纹、余额快照、上次同步时间等
+- 日志：`%APPDATA%/whale-pet/pet.log`（1MB 轮转，旧日志 `pet.log.1`）
 
 ## 关键决策与踩坑（务必先读）
 
@@ -64,6 +66,10 @@ test/               单元测试（node --test）
 12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。
 13. **CSP 收紧**：pet/menu/usage 三页补 `object-src 'none'; base-uri 'none'; connect-src 'none'`。
 14. **鼠标穿透的平台差异**：Windows/macOS 用 `setIgnoreMouseEvents(true/false)`；Linux/X11 用 `setShape([])`（空 shape）穿透、关闭时恢复 `lastShapeRects`。**Wayland/XWayland 下两者都不可靠**（事件转发、光标位置有已知问题），需用户改回 X11 会话才能用。
+15. **镜像翻转语义**：`config.mirror` 默认开启。开启=方向感知自动镜像（窗口中心在左半屏 → 整窗 `scaleX(-1)`，鲸鱼+气泡一起翻、文字/动图再反向翻回）；关闭=锁定当前方向（`updateAnchor` 直接 return，不重置）。`flipped` 是运行时变量，不落盘，重启自然回默认（贴右缘、原方向）。
+16. **缩放锚点**：`setScale` 按 `flipped` 决定固定哪个角——未镜像固定右下角、镜像固定左下角，避免贴左镜像时缩放漂移。缩放用 `window:set-bounds`（位置+尺寸一次原子设置），不能再用 `setSize`+`setPosition` 两步（会竞态导致实际尺寸未变、位移受限）。
+17. **运行日志**：`lib/log.js` 写 `pet.log`（1MB 轮转），默认 info；`WHALE_PET_LOG_LEVEL` / `WHALE_PET_TRACE=1` 打开 debug。所有进日志的字符串先 `redact()` 掩码密钥。`config.readFile()` 不打日志（避免 `secrets()→getEffective()→readFile()→log` 递归），`secrets()` 有重入保护。
+18. **Windows 终端乱码**：中文 Windows 控制台是 GBK，直接 `console.log` 中文会乱码。`log.js` 用 `chcp` 检测代码页，`iconv-lite` 把终端回显按对应编码（gbk/big5/...）写字节；文件仍写 UTF-8。
 
 ## 打包与分发
 

@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   getDisplayBounds: () => ipcRenderer.invoke('window:get-display-bounds'),
   resizeWindow: (w, h) => ipcRenderer.send('window:resize', { w, h }),
   setWindowPos: (x, y) => ipcRenderer.send('window:set-pos', { x, y }),
+  setBounds: (x, y, w, h) => ipcRenderer.send('window:set-bounds', { x, y, w, h }),
   // 透明点击穿透：把窗口裁剪为 鲸鱼/气泡/按钮 区域，其余部分点击直接落到桌面
   setShape: (rects) => ipcRenderer.send('pet:shape', { rects }),
   // 拖拽：渲染进程上报原始位移增量（dragDelta），主进程双通道引擎移动窗口；
@@ -44,6 +45,8 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   closeMenu: () => ipcRenderer.send('menu:close'),
   // 用系统默认程序打开文件/目录/URL
   openPath: (path) => ipcRenderer.invoke('shell:open-path', { path }),
+  // 打开运行日志文件
+  openLog: () => ipcRenderer.invoke('log:open'),
   // 事件
   onConfigChanged: (cb) => ipcRenderer.on('config:changed', (_e, cfg) => cb(cfg)),
   onCustomChanged: (cb) => ipcRenderer.on('custom:changed', (_e, data) => cb(data)),

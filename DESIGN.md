@@ -1,7 +1,7 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-08-30
+> 更新日期：2026-09-01
 
 ## 1. 项目定位
 
@@ -61,10 +61,11 @@ meta(key, value)                                                          -- 账
 
 ## 5. 功能模块
 
-1. **桌宠**：余额气泡、拖拽、Q 弹、点击穿透（setShape）、低余额提醒、随机台词、峰谷提示、闲置半透明。
+1. **桌宠**：余额气泡、拖拽、Q 弹、点击穿透（setShape）、低余额提醒、随机台词、峰谷提示、闲置半透明、方向感知镜像（设置可开关、关闭锁定方向）。
 2. **托盘**：显示/隐藏勾选、鼠标穿透勾选、立即刷新、打开设置、用量统计、开机自启、退出。
-3. **设置**：API Key、平台令牌（自动登录）、外观/文案/音效/图片/台词。
+3. **设置**：API Key、平台令牌（自动登录）、外观/文案/音效/图片/台词、镜像翻转开关、打开日志。
 4. **用量统计**：历史回填、近 7/30/90/365 天或自定义日期、每日用量走势（按模型/按计费类型/按 API Key，支持 Tokens/费用切换）+ 各模型占比饼图 + 累计趋势 + 用量热力图 + 分时下钻（弹窗）、充值余额卡片、上次同步时间（GMT+8）。
+5. **日志**：文件日志 `pet.log`（1MB 轮转 + 密钥掩码），主进程关键点埋点，Windows 终端按本机代码页回显避免乱码。
 
 ## 6. 关键决策
 
@@ -80,6 +81,9 @@ meta(key, value)                                                          -- 账
 10. **SQLite 批量落盘**：`beginBatch()/flush()` 让一次同步只落盘一次。
 11. **模型定价精确匹配**：未知模型走默认价；平台把旧版 chat/reasoner 合并为 `deepseek-chat & deepseek-reasoner`。
 12. **安全加固与 CSP 收紧**：密钥掩码、openPath 白名单、登录窗护栏、raw 留存上限、三页 `object-src/base-uri/connect-src 'none'`。
+13. **镜像翻转**：`mirror` 默认开启，方向感知自动镜像（整窗 `scaleX(-1)`，鲸鱼+气泡一起翻、文字/动图反向翻回，旋转中心为两者合起来的中部）；关闭=锁定当前方向；重启回默认。
+14. **缩放/多屏适配**：小屏动态限制最大缩放；多显示器镜像锚点随屏更新；跨屏钳制统一 `getDisplayMatching`；缩放用一次原子 `setBounds`（避免 `setSize`+`setPosition` 竞态导致位移受限/漂移）。
+15. **运行日志**：`lib/log.js` 写 `pet.log`，默认 info，`WHALE_PET_LOG_LEVEL`/`WHALE_PET_TRACE` 开 debug；`redact()` 掩码密钥；`config.readFile` 不打日志防递归。Windows 终端用 `chcp`+`iconv-lite` 按本机代码页编码，文件保持 UTF-8。
 
 ## 7. 风险与缓解
 
@@ -94,7 +98,7 @@ meta(key, value)                                                          -- 账
 DeepseekAPIUsagePet/
 ├── AGENTS.md / DESIGN.md    # 项目说明 / 设计文档
 ├── main.js / preload.js     # Electron 主进程 / IPC 安全桥
-├── lib/                     # balance / config / ledger / lines / store / usage-sync
+├── lib/                     # balance / config / ledger / lines / log / store / usage-sync
 ├── renderer/                # pet（桌宠）/ menu（设置）/ usage（用量面板）/ echarts.min.js
 ├── assets/                  # 鲸鱼素材 / 音效
 └── test/                    # 单元测试

@@ -14,6 +14,7 @@ const balanceMod = require('./lib/balance')
 const linesMod = require('./lib/lines')
 const storeMod = require('./lib/store')
 const usageMod = require('./lib/usage-sync')
+const log = require('./lib/log')
 
 const IS_SMOKE = process.argv.includes('--smoke-test')
 const BASE_PX = 320
@@ -62,12 +63,21 @@ if (!gotLock) {
 }
 
 function main() {
-  app.whenReady().then(onReady).catch((err) => { console.error('[startup] 启动失败:', err && (err.stack || err.message || err)) })
+  app.whenReady().then(onReady).catch((err) => { log.error('[startup] 启动失败: ' + (err && (err.stack || err.message || err))) })
   app.on('window-all-closed', () => {
     app.quit()
   })
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
+    log.info('[app] 退出')
+  })
+
+  process.on('uncaughtException', (err) => {
+    log.error('[fatal] 未捕获异常: ' + (err && (err.stack || err.message || err)))
+    app.exit(1)
+  })
+  process.on('unhandledRejection', (reason) => {
+    log.error('[fatal] 未处理的 Promise 拒绝: ' + (reason && (reason.stack || reason.message || reason)))
   })
 }
 
@@ -75,8 +85,9 @@ async function onReady() {
   try {
     await storeMod.init(path.join(configMod.CONFIG_DIR, 'usage.db'))
   } catch (err) {
-    console.warn('[store] 初始化失败: ' + ((err && err.message) || err))
+    log.warn('[store] 初始化失败: ' + ((err && err.message) || err))
   }
+  log.info('[app] 启动成功 v' + app.getVersion() + ' (' + process.platform + ') dir=' + configMod.CONFIG_DIR)
   balanceService = new balanceMod.BalanceService()
   linesMod.readPool() // 启动即生成随机台词默认池（~/.config/whale-pet/lines.json，首次）
   autoSyncIfStale() // 启动时立即检查一次（无令牌 / 未超时 / 已关闭则直接跳过）
@@ -257,7 +268,7 @@ function setupTray() {
     tray.on('double-click', togglePet)
     rebuildTrayMenu()
   } catch (err) {
-    console.warn('[tray] 托盘不可用: ' + ((err && err.message) || err))
+    log.warn('[tray] 托盘不可用: ' + ((err && err.message) || err))
   }
 }
 
@@ -327,10 +338,14 @@ function broadcast(channel, payload) {
 async function syncUsage(onProgress) {
   const cfg = configMod.getEffective()
   if (!cfg.platformToken) return { ok: false, error: '未配置平台令牌（DEEPSEEK_PLATFORM_TOKEN）' }
+  const t0 = Date.now()
+  log.info('[usage] 全量同步开始')
   try {
     const r = await usageMod.syncAll(cfg.platformToken, onProgress)
+    log.info('[usage] 全量同步完成 耗时 ' + (Date.now() - t0) + 'ms ' + JSON.stringify(r))
     return { ok: true, ...r }
   } catch (err) {
+    log.warn('[usage] 全量同步失败: ' + String((err && err.message) || err))
     return {
       ok: false,
       error: String((err && err.message) || err),
@@ -344,10 +359,14 @@ async function syncUsage(onProgress) {
 async function syncUsageLight() {
   const cfg = configMod.getEffective()
   if (!cfg.platformToken) return { ok: false, error: '未配置平台令牌' }
+  const t0 = Date.now()
+  log.info('[usage] 轻量同步开始')
   try {
     const r = await usageMod.syncRecent(cfg.platformToken)
+    log.info('[usage] 轻量同步完成 耗时 ' + (Date.now() - t0) + 'ms ' + JSON.stringify(r))
     return { ok: true, ...r }
   } catch (err) {
+    log.warn('[usage] 轻量同步失败: ' + String((err && err.message) || err))
     return { ok: false, error: String((err && err.message) || err) }
   }
 }
@@ -360,18 +379,19 @@ let autoSyncing = false
 async function autoSyncIfStale() {
   if (autoSyncing) return
   const cfg = configMod.getEffective()
-  if (!cfg.platformToken || cfg.autoSync === false) return
+  if (cfg.autoSync === false) { log.debug('[usage] 自动同步跳过：已关闭'); return }
+  if (!cfg.platformToken) { log.debug('[usage] 自动同步跳过：未配置平台令牌'); return }
   let last = null
   try { last = storeMod.getMeta('last_sync_at') } catch (e) {}
   if (last) {
     const t = Date.parse(last)
-    if (isFinite(t) && Date.now() - t < AUTO_SYNC_STALE_MS) return
+    if (isFinite(t) && Date.now() - t < AUTO_SYNC_STALE_MS) { log.debug('[usage] 自动同步跳过：距上次未到 12 小时'); return }
   }
   autoSyncing = true
   try {
     await syncUsageLight()
   } catch (err) {
-    console.warn('[usage] 自动同步失败: ' + ((err && err.message) || err))
+    log.warn('[usage] 自动同步失败: ' + ((err && err.message) || err))
   } finally {
     autoSyncing = false
   }
@@ -494,9 +514,9 @@ function setupShortcuts() {
   const accel = process.env.WHALE_PET_SHORTCUT || 'CommandOrControl+Shift+R'
   try {
     const ok = globalShortcut.register(accel, sendRefresh)
-    if (!ok) console.warn('[shortcut] 注册失败（可能已被占用）: ' + accel)
+    if (!ok) log.warn('[shortcut] 注册失败（可能已被占用）: ' + accel)
   } catch (err) {
-    console.warn('[shortcut] ' + ((err && err.message) || err))
+    log.warn('[shortcut] ' + ((err && err.message) || err))
   }
 }
 
@@ -536,7 +556,7 @@ function applyAutostart(enabled) {
     app.setLoginItemSettings({ openAtLogin: !!enabled })
     return true
   } catch (err) {
-    console.warn('[autostart] ' + ((err && err.message) || err))
+    log.warn('[autostart] ' + ((err && err.message) || err))
     return false
   }
 }
@@ -654,6 +674,7 @@ function registerIpc() {
     if (hasOwn(patch, 'platformToken') && !isMenuSender(e) && !isUsageSender(e)) delete patch.platformToken
     const next = configMod.save(patch)
     if (next) {
+      log.info('[config] 更新: ' + Object.keys(patch).join(','))
       // 影响余额结果的字段变化 → 使缓存失效，下次立即按新配置计算
       if (hasOwn(patch, 'apiKey') || hasOwn(patch, 'platformToken') || hasOwn(patch, 'usageMode')) {
         balanceService.invalidate()
@@ -753,15 +774,11 @@ function registerIpc() {
 
   ipcMain.on('window:resize', (e, msg) => {
     if (!petWin || petWin.isDestroyed()) return
-    let maxW = 2000
-    let maxH = 2000
-    try {
-      const wa = screen.getPrimaryDisplay().workArea
-      maxW = Math.max(80, wa.width)
-      maxH = Math.max(80, wa.height)
-    } catch (err) { /* 取不到工作区时用保守上限 */ }
-    const w = Math.min(maxW, Math.max(80, Math.round(Number(msg && msg.w) || BASE_PX)))
-    const h = Math.min(maxH, Math.max(80, Math.round(Number(msg && msg.h) || BASE_PX)))
+    // 上限取足够大的固定值：桌宠最大 800（320×2.5），4096 足够防御异常值，
+    // 又不会像 workArea 那样在 DPI 缩放/小屏时误伤合法缩放。
+    const CAP = 4096
+    const w = Math.min(CAP, Math.max(80, Math.round(Number(msg && msg.w) || BASE_PX)))
+    const h = Math.min(CAP, Math.max(80, Math.round(Number(msg && msg.h) || BASE_PX)))
     if (process.env.WHALE_PET_TRACE === '1') console.log('[trace] resize ->', w, h)
     petWin.setSize(w, h)
     // 部分 WM 在 setSize 后会掉置顶层，重新声明
@@ -773,6 +790,19 @@ function registerIpc() {
     const x = Math.round(Number(msg && msg.x) || 0)
     const y = Math.round(Number(msg && msg.y) || 0)
     petWin.setPosition(x, y)
+  })
+
+  // 位置 + 尺寸一次原子设置（缩放时避免 setSize 与 setPosition 两步竞态）
+  ipcMain.on('window:set-bounds', (e, msg) => {
+    if (!petWin || petWin.isDestroyed()) return
+    const CAP = 4096
+    const x = Math.round(Number(msg && msg.x) || 0)
+    const y = Math.round(Number(msg && msg.y) || 0)
+    const w = Math.min(CAP, Math.max(80, Math.round(Number(msg && msg.w) || BASE_PX)))
+    const h = Math.min(CAP, Math.max(80, Math.round(Number(msg && msg.h) || BASE_PX)))
+    if (process.env.WHALE_PET_TRACE === '1') console.log('[trace] set-bounds ->', x, y, w, h)
+    petWin.setBounds({ x, y, width: w, height: h })
+    pinPetWindow(petWin)
   })
 
   // ---------- 拖拽（主进程双通道引擎，见文件头注释）----------
@@ -832,7 +862,7 @@ function registerIpc() {
     if (Math.abs(cx - expectX) > 8 || Math.abs(cy - expectY) > 8) return
     dragState.lastClientX = cx
     dragState.lastClientY = cy
-    const bd = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).bounds
+    const bd = screen.getDisplayMatching(b).bounds
     const nx = Math.round(Math.min(Math.max(b.x + dx, bd.x), Math.max(bd.x, bd.x + bd.width - b.width)))
     const ny = Math.round(Math.min(Math.max(b.y + dy, bd.y), Math.max(bd.y, bd.y + bd.height - b.height)))
     if (nx !== b.x || ny !== b.y) petWin.setPosition(nx, ny)
@@ -850,7 +880,13 @@ function registerIpc() {
       pos = { x: p[0], y: p[1] }
     }
     dragState = null
-    return pos || { x: 0, y: 0 }
+    const b = (petWin && !petWin.isDestroyed()) ? petWin.getBounds() : null
+    return {
+      x: (pos && pos.x) || 0,
+      y: (pos && pos.y) || 0,
+      width: (b && b.width) || BASE_PX,
+      height: (b && b.height) || BASE_PX,
+    }
   })
 
   // ---------- 主图 / 预警图上传（复制到配置目录，与源文件解耦）----------
@@ -983,6 +1019,27 @@ function registerIpc() {
         await shell.openPath(configMod.CONFIG_DIR)
       }
       return err ? { ok: false, error: err } : { ok: true }
+    } catch (err) {
+      return { ok: false, error: String((err && err.message) || err) }
+    }
+  })
+
+  // ---------- 打开运行日志（pet.log） ----------
+  ipcMain.handle('log:open', async () => {
+    const logFile = path.join(configMod.CONFIG_DIR, 'pet.log')
+    try {
+      // 尚未产生日志时，创建一个空文件再打开（避免 shell.openPath 打开失败）
+      if (!fs.existsSync(logFile)) {
+        fs.mkdirSync(configMod.CONFIG_DIR, { recursive: true })
+        fs.writeFileSync(logFile, '', { encoding: 'utf8' })
+      }
+      const err = await shell.openPath(logFile)
+      if (err) {
+        // 打不开文件 → 退而打开配置目录（在资源管理器中高亮）
+        const err2 = await shell.openPath(configMod.CONFIG_DIR)
+        if (err2) return { ok: false, error: err2 }
+      }
+      return { ok: true }
     } catch (err) {
       return { ok: false, error: String((err && err.message) || err) }
     }

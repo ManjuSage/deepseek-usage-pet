@@ -30,7 +30,9 @@ html, body {
   transition: transform .3s ease;
 }
 .wp-root.wp-dragging { cursor: grabbing; transition: none; }
-/* 方向感知锚点：窗口位于屏幕左半侧时整体镜像（鲸鱼贴左缘，可触左边缘） */
+/* 方向感知锚点：窗口位于屏幕左半侧时，鲸鱼 + 气泡作为整体左右镜像，
+   旋转中心为两者合起来的中心（.wp-root 的 50% 50%，即窗口中部）；
+   文字/动图再反向翻回保持可读。 */
 .wp-root.wp-left { transform: scaleX(-1); }
 .wp-root.wp-left .wp-text { transform: translate(-50%, -50%) scaleX(-1); }
 .wp-root.wp-left .wp-gif { transform: translate(-50%, -50%) scaleX(-1); }

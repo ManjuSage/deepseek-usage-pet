@@ -17,7 +17,7 @@
     apiKey: $('wm-apikey'), apiKeyEye: $('wm-apikey-eye'), apiKeyNote: $('wm-apikey-note'),
     token: $('wm-token'), tokenEye: $('wm-token-eye'), tokenLogin: $('wm-token-login'),
     usage: $('wm-usage'), refresh: $('wm-refresh'), threshold: $('wm-threshold'), autostart: $('wm-autostart'), autosync: $('wm-autosync'),
-    bubble: $('wm-bubble'), bubbleInterval: $('wm-bubble-interval'), idleFade: $('wm-idlefade'),
+    bubble: $('wm-bubble'), bubbleInterval: $('wm-bubble-interval'), idleFade: $('wm-idlefade'), mirror: $('wm-mirror'),
     idleOpacity: $('wm-idle-opacity'), idleOpacityV: $('wm-idle-opacity-v'),
     scale: $('wm-scale'), scaleV: $('wm-scale-v'),
     peak: $('wm-peak'), peakText: $('wm-peaktext'), peakOff: $('wm-peak-off'), peakOn: $('wm-peak-on'),
@@ -35,6 +35,7 @@
     customReload: $('wm-custom-reload'), customOpen: $('wm-custom-open'), customNote: $('wm-custom-note'),
     configOpen: $('wm-config-open'),
     usageOpen: $('wm-usage-open'),
+    logOpen: $('wm-log-open'),
     soundsOpen: $('wm-sounds-open'),
     imagesOpen: $('wm-images-open'),
     refreshNow: $('wm-refresh-now'),
@@ -98,7 +99,8 @@
     els.autosync.checked = cfg.autoSync !== false
     els.bubble.checked = cfg.bubbleOn !== false
     els.bubbleInterval.value = String(cfg.bubbleInterval != null ? cfg.bubbleInterval : 900)
-    els.idleFade.checked = cfg.idleFade !== false
+  els.idleFade.checked = cfg.idleFade !== false
+  els.mirror.checked = cfg.mirror !== false
     els.idleOpacity.value = String(cfg.idleOpacity != null ? cfg.idleOpacity : 0.6)
     els.idleOpacityV.textContent = Math.round((cfg.idleOpacity != null ? cfg.idleOpacity : 0.6) * 100) + '%'
     els.scale.value = String(cfg.scale || 1)
@@ -212,6 +214,7 @@
   els.peakText.addEventListener('change', function () { api.setConfig({ peakText: els.peakText.checked }) })
   els.bubble.addEventListener('change', function () { api.setConfig({ bubbleOn: els.bubble.checked }) })
   els.idleFade.addEventListener('change', function () { api.setConfig({ idleFade: els.idleFade.checked }) })
+  els.mirror.addEventListener('change', function () { api.setConfig({ mirror: els.mirror.checked }) })
   els.autostart.addEventListener('change', function () { api.setConfig({ autostart: els.autostart.checked }) })
   els.autosync.addEventListener('change', function () { api.setConfig({ autoSync: els.autosync.checked }) })
   els.alertImage.addEventListener('change', function () { api.setConfig({ alertImage: els.alertImage.checked }) })
@@ -364,6 +367,14 @@
   bindOpen(els.usageOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.usage) || '' })
   bindOpen(els.soundsOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.sounds) || '' })
   bindOpen(els.imagesOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.images) || '' })
+
+  // ---------- 打开运行日志 ----------
+  if (els.logOpen) {
+    els.logOpen.addEventListener('click', async function () {
+      els.logOpen.disabled = true
+      try { await api.openLog() } finally { els.logOpen.disabled = false }
+    })
+  }
 
   // ---------- 立即刷新 ----------
   els.refreshNow.addEventListener('click', async function () {

@@ -80,6 +80,9 @@
       <div id="wm-ledger-note" class="wm-note wm-span">小鲸鱼记账文件 usage.json（跨天自动归档最近 30 天）。
         <button id="wm-usage-open" class="wm-mini">打开文件</button>
       </div>
+      <div class="wm-note wm-span">运行日志 pet.log（同步/余额/异常排查）。
+        <button id="wm-log-open" class="wm-mini">打开日志</button>
+      </div>
     </section>
 
     <!-- ================= 外观 ================= -->
@@ -108,6 +111,11 @@
           <input id="wm-idlefade" class="wm-check" type="checkbox" title="鼠标离开 3 秒后鲸鱼渐隐">
         </label>
         <div class="wm-note">鼠标离开 3 秒后渐隐</div>
+        <label class="wm-row">
+          <span class="wm-label">镜像翻转</span>
+          <input id="wm-mirror" class="wm-check" type="checkbox" title="开启：拖到屏幕左半侧自动镜像、右半侧恢复原始方向；关闭：锁定当前方向（重启后恢复默认）">
+        </label>
+        <div class="wm-note">开启自动镜像，关闭锁定方向</div>
       </div>
       <label class="wm-row wm-span">
         <span class="wm-label">闲置不透明度</span>

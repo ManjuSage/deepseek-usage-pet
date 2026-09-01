@@ -139,6 +139,7 @@
   var bubbleIntervalTimer = null
   var idleFade = true
   var passthrough = false
+  var mirror = true
   var refreshIntervalMs = 60000
   var threshold = 10
   var alertImage = false
@@ -156,8 +157,6 @@
   var currentImgSrc = ''
   var lastPointerMoveAt = Date.now()
   var flipped = false
-  var anchorCenterX = null // 屏幕水平中心：窗口位于左半侧 → 鲸鱼贴左（镜像），可触左边缘
-  var anchorCenterY = null
 
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
 
@@ -565,24 +564,27 @@
       x = wa.x + wa.width - state.winW // 默认右下角
       y = wa.y + wa.height - state.winH
     }
-    advancePos(x, y)
+    await advancePos(x, y)
     await api.setWindowPos(x, y)
   }
 
-  function advancePos(x, y) {
+  async function advancePos(x, y) {
     state.posX = x
     state.posY = y
-    updateAnchor()
+    await updateAnchor()
   }
 
-  // 方向感知锚点：窗口中心在屏幕左半 → 鲸鱼贴窗口左缘（水平镜像）→ 可触及左边缘
-  function updateAnchor() {
-    if (anchorCenterX === null) return
-    var onLeft = state.posX + state.winW / 2 < anchorCenterX
+  // 方向感知锚点：窗口中心在当前显示器左半 → 鲸鱼 + 气泡整体镜像（可选开关）。
+  // 旋转中心为两者合起来的中心（.wp-root 的 50% 50%），贴边拖拽后不再漂移。
+  async function updateAnchor() {
+    if (!mirror) return // 关闭镜像 = 锁定当前方向，不重置、不跟随位置
+    var bd = await api.getDisplayBounds()
+    var cx = bd.x + bd.width / 2
+    var onLeft = state.posX + state.winW / 2 < cx
     if (onLeft !== flipped) {
       flipped = onLeft
       root.classList.toggle('wp-left', flipped)
-      reportShape() // 镜像后形状需随之镜像
+      reportShape() // 贴边/镜像变化后重报命中区
     }
   }
 
@@ -629,7 +631,7 @@
       var m = menuBtn.offsetWidth
       if (m > 0) p(menuBtn.offsetLeft - 4, menuBtn.offsetTop - 4, m + 8, menuBtn.offsetHeight + 8)
       if (flipped) {
-        // 水平镜像：把矩形按窗口宽度翻转
+        // 整体镜像（.wp-root scaleX(-1)）：把所有命中矩形按窗口宽度水平翻转
         for (var i = 0; i < rects.length; i++) rects[i].x = W - (rects[i].x + rects[i].w)
       }
       api.setShape(rects)
@@ -637,26 +639,28 @@
   }
 
   async function setScale(v) {
-    var next = Math.round(clamp(Number(v), MIN_SCALE, MAX_SCALE) * 10) / 10
+    var bd = await api.getDisplayBounds()
+    // 小屏自适应：最大缩放不超过「屏幕较小边能容纳桌宠」的倍数，避免超出屏幕后被钉在边缘
+    var maxForScreen = Math.min(bd.width, bd.height) / BASE_PX
+    var maxScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.floor(maxForScreen * 10) / 10))
+    var next = Math.round(clamp(Number(v), MIN_SCALE, maxScale) * 10) / 10
     if (next === state.scale) return
     var oldW = state.winW, oldH = state.winH
     var newW = Math.round(BASE_PX * next)
     var newH = newW
-    // 固定鲸鱼右下角（无镜像翻转，锚点唯一）
-    var fixX = state.posX + oldW
-    var fixY = state.posY + oldH
+    // 固定鲸鱼的可见角：未镜像固定右下角，镜像（贴左缘）固定左下角；
+    // 避免贴左镜像时缩放导致鲸鱼左右漂移。
+    var x = flipped ? state.posX : (state.posX + oldW - newW)
+    var y = state.posY + oldH - newH
     state.scale = next
     root.style.setProperty('--wp-base', newW + 'px')
     state.winW = newW
     state.winH = newH
-    var x = fixX - newW
-    var y = fixY - newH
-    var wa = await api.getWorkArea()
-    x = clamp(x, wa.x, wa.x + wa.width - newW)
-    y = clamp(y, wa.y, wa.y + wa.height - newH)
-    advancePos(x, y)
-    await api.resizeWindow(newW, newH)
-    await api.setWindowPos(x, y)
+    // 与拖拽/finishDrag 一致：用显示器物理边界钳制（可贴到任意桌面边缘）
+    x = clamp(x, bd.x, bd.x + bd.width - newW)
+    y = clamp(y, bd.y, bd.y + bd.height - newH)
+    await advancePos(x, y)
+    await api.setBounds(x, y, newW, newH)
     api.setConfig({ scale: next, posX: x, posY: y })
     reportShape()
   }
@@ -821,10 +825,14 @@
     var bd = await api.getDisplayBounds()
     // 无吸附/无翻转：自由定位，仅钳制在显示器物理边界内（可贴到任意桌面边缘）
     var x = Math.round(end.x), y = Math.round(end.y)
-    var w = state.winW, h = state.winH
+    // 用主进程返回的真实窗口尺寸，避免缩放异步期间 state.winW 与实际尺寸不一致导致钳制偏小
+    var w = typeof end.width === 'number' ? end.width : state.winW
+    var h = typeof end.height === 'number' ? end.height : state.winH
     x = clamp(x, bd.x, bd.x + bd.width - w)
     y = clamp(y, bd.y, bd.y + bd.height - h)
-    advancePos(x, y)
+    state.winW = w
+    state.winH = h
+    await advancePos(x, y)
     await api.setWindowPos(x, y)
     api.setConfig({ posX: x, posY: y })
   }
@@ -974,6 +982,11 @@
     }
     idleFade = c.idleFade !== false
     applyPassthroughState(c.passthrough === true)
+    mirror = c.mirror !== false
+    if (mirror) {
+      await updateAnchor() // 开启镜像时立即按当前位置重算方向（含从关变开）
+    }
+    // 关闭镜像 = 锁定当前方向：不做任何重置（重启时由 init 里的默认值恢复贴右缘）
     // 闲置不透明度（可调，0.2 - 1.0）
     var idleOp = (typeof c.idleOpacity === 'number' && isFinite(c.idleOpacity)) ? Math.min(1, Math.max(0.2, c.idleOpacity)) : 0.6
     root.style.setProperty('--wp-idle-opacity', String(idleOp))
@@ -1014,19 +1027,14 @@
   // ------------------------------------------------------------- 启动
   async function init() {
     var c = await api.getConfig()
+    mirror = c.mirror !== false // 启动即确定镜像开关，保证初始定位不误触自动镜像
     state.scale = c.scale || 1
     root.style.setProperty('--wp-base', (BASE_PX * state.scale) + 'px')
-    // 屏幕水平/垂直中心（用于方向感知锚点）
-    try {
-      var bd = await api.getDisplayBounds()
-      anchorCenterX = bd.x + bd.width / 2
-      anchorCenterY = bd.y + bd.height / 2
-    } catch (err) {}
     // 默认位置：右下角（等待 initPosition 覆盖为记忆位置）
     var wa0 = await api.getWorkArea()
     state.winW = Math.round(BASE_PX * state.scale)
     state.winH = state.winW
-    advancePos(wa0.x + wa0.width - state.winW, wa0.y + wa0.height - state.winH)
+    await advancePos(wa0.x + wa0.width - state.winW, wa0.y + wa0.height - state.winH)
     await api.resizeWindow(state.winW, state.winH)
     await initPosition()
     await applyConfig(c, true)
