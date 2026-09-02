@@ -70,12 +70,15 @@ test/               单元测试（node --test）
 16. **缩放锚点**：`setScale` 按 `flipped` 决定固定哪个角——未镜像固定右下角、镜像固定左下角，避免贴左镜像时缩放漂移。缩放用 `window:set-bounds`（位置+尺寸一次原子设置），不能再用 `setSize`+`setPosition` 两步（会竞态导致实际尺寸未变、位移受限）。
 17. **运行日志**：`lib/log.js` 写 `pet.log`（1MB 轮转），默认 info；`WHALE_PET_LOG_LEVEL` / `WHALE_PET_TRACE=1` 打开 debug。所有进日志的字符串先 `redact()` 掩码密钥。`config.readFile()` 不打日志（避免 `secrets()→getEffective()→readFile()→log` 递归），`secrets()` 有重入保护。
 18. **Windows 终端乱码**：中文 Windows 控制台是 GBK，直接 `console.log` 中文会乱码。`log.js` 用 `chcp` 检测代码页，`iconv-lite` 把终端回显按对应编码（gbk/big5/...）写字节；文件仍写 UTF-8。
+19. **用量图表颜色统一**：`renderer/usage.js` 里不再用「首次出现才分配」的 `modelColor()`。改为 `FIXED_COLORS`（已知模型/类型/费用线固定色，Tableau 10 风格）+ `FALLBACK`（未知模型/API Key 按名称排序分配）。分时明细的模型名也要先过 `modelLabel` 再取色，否则会出现 `deepseek-v4-pro` 与 `V4 Pro` 两个 key、颜色对不上。
+20. **Linux AppImage 用 CI 构建**：Windows 本机无法直接出 AppImage，`.github/workflows/build-linux.yml` 在推送 `v*` tag 时用 Ubuntu runner 跑 `electron-builder --linux AppImage`，并用 `softprops/action-gh-release` 挂到同名 Release。
 
 ## 打包与分发
 
 - `build.win.target = ["nsis", "portable"]`：一次产出安装包 + 便携版。
 - 安装包：NSIS 向导式（`oneClick:false`），`perMachine:false` 提供「仅当前用户 / 所有用户」选择页，`installerLanguages: ["zh_CN", "en_US"]` 中文优先，可选安装目录 + 桌面/开始菜单快捷方式。
 - 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + zip + win-unpacked）。
+- Linux 产物：AppImage 由 GitHub Actions 在 `v*` tag 时自动构建并挂 Release（`softprops/action-gh-release`）；也可在 Linux 上手动 `npm run dist:linux`。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，需用户点「更多信息 → 仍要运行」。
 - 打包联网下载 NSIS 工具链 / Electron 用 npmmirror 镜像（直接 GitHub 可能失败）。
 - electron-builder 26 需要下载 `icons` / `nsis` / `7zip` / `nsis-resources` 等二进制，npmmirror 镜像可能缺（404），需从 GitHub 手动下载放进 `%LOCALAPPDATA%\electron-builder\Cache`。

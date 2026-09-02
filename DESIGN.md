@@ -1,7 +1,7 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-09-01
+> 更新日期：2026-09-02
 
 ## 1. 项目定位
 
@@ -84,6 +84,8 @@ meta(key, value)                                                          -- 账
 13. **镜像翻转**：`mirror` 默认开启，方向感知自动镜像（整窗 `scaleX(-1)`，鲸鱼+气泡一起翻、文字/动图反向翻回，旋转中心为两者合起来的中部）；关闭=锁定当前方向；重启回默认。
 14. **缩放/多屏适配**：小屏动态限制最大缩放；多显示器镜像锚点随屏更新；跨屏钳制统一 `getDisplayMatching`；缩放用一次原子 `setBounds`（避免 `setSize`+`setPosition` 竞态导致位移受限/漂移）。
 15. **运行日志**：`lib/log.js` 写 `pet.log`，默认 info，`WHALE_PET_LOG_LEVEL`/`WHALE_PET_TRACE` 开 debug；`redact()` 掩码密钥；`config.readFile` 不打日志防递归。Windows 终端用 `chcp`+`iconv-lite` 按本机代码页编码，文件保持 UTF-8。
+16. **图表颜色统一**：`FIXED_COLORS` 给已知模型/类型/费用线固定色（Tableau 10 风格），未知模型与 API Key 从 `FALLBACK` 按名称排序分配；`rebuildColorMap()` 在加载日级/分时数据后重建。所有图表（每日走势/分时明细/饼图）统一走 `colorFor()`。
+17. **Linux AppImage 走 CI**：`.github/workflows/build-linux.yml` 在 `v*` tag 时用 Ubuntu runner 构建 AppImage 并挂到 Release；Windows 本机只出 Windows 产物。
 
 ## 7. 风险与缓解
 

@@ -381,7 +381,7 @@
     els.refreshNow.textContent = '刷新中...'
     els.refreshNow.disabled = true
     try {
-      var r = await api.getBalance()
+      var r = await api.refreshPet()
       els.refreshNow.textContent = r && r.ok ? '已刷新' : '失败（检查 API Key）'
     } catch (err) {
       els.refreshNow.textContent = '失败'

@@ -5,11 +5,47 @@
   'use strict'
   var api = window.whaleAPI
 
-  var PALETTE = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc']
-  var modelColors = {}
-  function modelColor(name) {
-    if (!modelColors[name]) modelColors[name] = PALETTE[Object.keys(modelColors).length % PALETTE.length]
-    return modelColors[name]
+  // 统一颜色标准：已知模型/类型/费用线用固定颜色；未知模型与 API Key 按名称排序从兜底调色板分配。
+  var FIXED_COLORS = {
+    'Chat / Reasoner': '#59A14F',
+    'V4 Flash': '#76B7B2',
+    'V4 Flash Vision': '#F28E2B',
+    'V4 Pro': '#4E79A7',
+    'Chat': '#B07AA1',
+    'Reasoner': '#EDC948',
+    '缓存命中': '#4E79A7',
+    '缓存未命中': '#EDC948',
+    '输出': '#59A14F',
+    '费用': '#E15759',
+  }
+  var FALLBACK = ['#E15759', '#FF9DA7', '#9C755F', '#BAB0AC', '#4E79A7', '#F28E2B', '#76B7B2', '#59A14F', '#B07AA1', '#EDC948']
+  var dynamicColors = {}
+  function colorFor(name) {
+    if (FIXED_COLORS[name]) return FIXED_COLORS[name]
+    if (dynamicColors[name]) return dynamicColors[name]
+    return FALLBACK[0] // 兜底（正常不会走到，rebuildColorMap 已覆盖全部动态名）
+  }
+  function collectDynamicNames() {
+    var names = {}
+    function add(n) { if (n && !FIXED_COLORS[n]) names[n] = true }
+    var d = state.daily
+    if (d) {
+      ;['byModel', 'costByModel', 'modelTotals'].forEach(function (k) {
+        ;(d[k] || []).forEach(function (r) { add(modelLabel(r.model)) })
+      })
+      ;['byKey', 'costByKey'].forEach(function (k) {
+        ;(d[k] || []).forEach(function (r) { add(r.api_key_name || '(未命名)') })
+      })
+    }
+    var h = state.hourlyDetail
+    if (h && h.series) {
+      h.series.forEach(function (s) { add(h.dim === 'model' ? modelLabel(s.name) : s.name) })
+    }
+    return Object.keys(names)
+  }
+  function rebuildColorMap() {
+    var sorted = collectDynamicNames().sort()
+    sorted.forEach(function (n, i) { dynamicColors[n] = FALLBACK[i % FALLBACK.length] })
   }
   function modelLabel(m) {
     if (!m) return '(未命名)'
@@ -153,12 +189,12 @@
         // 计费类型下费用无法按类型拆分，退化为一条「当日费用」折线。
         var costByDate = {}
         ;(d.costTotals || []).forEach(function (r) { costByDate[r.utc_date] = Math.round(((costByDate[r.utc_date] || 0) + (Number(r.cost) || 0)) * 1e4) / 1e4 })
-        series = [{ name: '费用', type: 'line', data: dates.map(function (dt) { return costByDate[dt] || 0 }) }]
+        series = [{ name: '费用', type: 'line', lineStyle: { color: colorFor('费用') }, itemStyle: { color: colorFor('费用') }, data: dates.map(function (dt) { return costByDate[dt] || 0 }) }]
       } else {
         var byDate = {}
         ;(d.totals || []).forEach(function (r) { byDate[r.utc_date] = r })
         var mk = function (name, key) {
-          return { name: name, type: 'bar', stack: 'total', barMaxWidth: 20, data: dates.map(function (dt) { var r = byDate[dt]; return r ? (r[key] || 0) : 0 }) }
+          return { name: name, type: 'bar', stack: 'total', barMaxWidth: 20, itemStyle: { color: colorFor(name) }, data: dates.map(function (dt) { var r = byDate[dt]; return r ? (r[key] || 0) : 0 }) }
         }
         series = [mk('缓存命中', 'cache_hit'), mk('缓存未命中', 'cache_miss'), mk('输出', 'output')]
       }
@@ -185,7 +221,7 @@
         byDateName[r.utc_date + '|' + n] = (byDateName[r.utc_date + '|' + n] || 0) + toValue(r)
       })
       series = names.map(function (n) {
-        return { name: n, type: 'bar', stack: 'total', barMaxWidth: 20, itemStyle: { color: modelColor(n) }, data: dates.map(function (dt) { return byDateName[dt + '|' + n] || 0 }) }
+        return { name: n, type: 'bar', stack: 'total', barMaxWidth: 20, itemStyle: { color: colorFor(n) }, data: dates.map(function (dt) { return byDateName[dt + '|' + n] || 0 }) }
       })
     }
 
@@ -232,7 +268,7 @@
         type: 'pie', radius: ['40%', '72%'], center: ['50%', '50%'],
         label: { show: false },
         emphasis: { scaleSize: 6 },
-        data: items.map(function (x) { return { name: x.name, value: x.value, itemStyle: { color: modelColor(x.name) } } }),
+        data: items.map(function (x) { return { name: x.name, value: x.value, itemStyle: { color: colorFor(x.name) } } }),
       }],
     }, true)
   }
@@ -307,9 +343,10 @@
     var hours = []
     for (var h = 0; h < 24; h++) hours.push(String(h).padStart(2, '0') + ':00')
     var series = detail.series.map(function (s) {
-      return { name: s.name, type: 'bar', stack: 't', data: s.data }
+      var name = detail.dim === 'model' ? modelLabel(s.name) : s.name
+      return { name: name, type: 'bar', stack: 't', data: s.data, itemStyle: { color: colorFor(name) } }
     })
-    series.push({ name: '费用', type: 'line', yAxisIndex: 1, data: (detail.cost || []).map(function (c) { return Math.round((c || 0) * 1e4) / 1e4 }) })
+    series.push({ name: '费用', type: 'line', yAxisIndex: 1, lineStyle: { color: colorFor('费用') }, itemStyle: { color: colorFor('费用') }, data: (detail.cost || []).map(function (c) { return Math.round((c || 0) * 1e4) / 1e4 }) })
     chart.setOption({
       tooltip: tooltipCfg({
         trigger: 'axis',
@@ -357,6 +394,7 @@
     state.range.end = end
     var d = await api.getUsageDaily(start, end)
     state.daily = d
+    rebuildColorMap()
     renderDaily()
     renderModels()
     renderCumulative()
@@ -378,6 +416,7 @@
     showHourlyModal() // 先显示弹窗，确保容器可见，避免 ECharts 在隐藏容器上初始化出 0 尺寸
     var detail = await api.getUsageHourly(day, state.hourlyView)
     state.hourlyDetail = detail
+    rebuildColorMap()
     renderHourly(detail)
   }
 

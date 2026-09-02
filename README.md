@@ -6,6 +6,27 @@
 
 基于 [momo-OwO-qwq/DeepSeek-Whale-Pet](https://github.com/momo-OwO-qwq/DeepSeek-Whale-Pet)（MIT）二次开发的独立改版项目，已与原项目分离。其中**用量统计功能**参照 [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics)（Unlicense）实现。
 
+## 界面预览
+
+用量统计面板（`renderer/usage.*`）是「对账 + 用量可视化」的核心入口。以下截图展示了它在 Windows 上的实际效果（配色为 Tableau 10 风格调色板）。
+
+![登录平台获取令牌](docs/images/platform-token-login.png)
+
+用量统计需要**平台令牌**：点面板右上角「登录平台获取令牌」在弹出窗口登录后自动抓取，或点「手动粘贴令牌」在弹窗中粘贴 `userToken` 兜底。
+
+![用量统计总览](docs/images/usage-overview.png)
+
+顶部卡片实时显示总 Tokens、缓存命中、缓存未命中、输出、请求次数、累计费用与充值余额；**每日用量走势**支持按模型 / 按计费类型 / 按 API Key 拆分，并可在 **Tokens / 费用** 两种指标间切换。
+
+![分时明细](docs/images/usage-hourly-detail.png)
+
+点击每日走势的柱子可下钻当天的 **24 小时分时明细**：按模型拆分的柱状图 + 费用折线，悬停查看每个小时的 Tokens / 费用，并可继续按计费类型 / API Key 拆分。
+
+![用量趋势与热力图](docs/images/usage-trends.png)
+
+**各模型占比**环形图、**累计趋势**与**用量热力图**一屏尽览，均跟随当前日期范围并可在 Tokens / 费用间切换；热力图按「周 × 天」网格展示历史用量，悬停即可查看某天的具体数字。
+
+
 ## 特性
 
 ### 桌宠
@@ -115,6 +136,8 @@ DeepseekAPIUsagePet/
 | 安装包 | `dist/installer/` | NSIS 向导式安装：可选安装目录、可选「仅当前用户 / 所有用户」、中文界面、自动创建桌面与开始菜单快捷方式 |
 | 便携版 | `dist/portable/` | 免安装：单文件 exe + zip（解压即用） |
 
+Linux 的 **AppImage** 由 GitHub Actions 在发布 tag 时自动构建，并挂到对应 Release（见 `.github/workflows/build-linux.yml`）。也可在 Linux 上手动执行 `npm run dist:linux` 构建。
+
 > 联网下载 Electron / NSIS 工具链时建议走 npmmirror 镜像，避免直连 GitHub 失败：
 >
 > ```powershell
@@ -133,6 +156,7 @@ DeepseekAPIUsagePet/
 npm test         # 单元测试（node --test）
 npm run smoke    # 自动化冒烟测试（窗口/托盘/点击/拖拽截图验证）
 npm run dist:win # 打包（安装包 + 便携版）
+npm run dist:linux # 打包 Linux 产物（AppImage/deb/rpm/tar.gz，需在 Linux 上执行）
 ```
 
 更多架构细节、踩坑记录见 [AGENTS.md](AGENTS.md) 与 [DESIGN.md](DESIGN.md)。
@@ -163,6 +187,19 @@ npm run dist:win # 打包（安装包 + 便携版）
 | 内存优化 | — | — | **禁用硬件加速** + 设置窗口按需创建 |
 
 ## 更新日志
+
+### v1.0.4
+
+**新功能**
+
+- 用量统计图表配色统一：模型 / 类型 / API Key 改为固定映射（Tableau 10 风格），每日走势、分时明细、饼图跨图颜色一致。
+- 设置里的「立即刷新余额」现在也会弹出鲸鱼余额气泡（与托盘「立即刷新余额」行为一致）。
+- 新增 Linux **AppImage** 自动构建（GitHub Actions），发布时随 Windows 产物一起提供。
+
+**修复**
+
+- 分时明细的模型名改为友好名（`V4 Pro` / `V4 Flash` 等），与每日走势、饼图一致，不再显示 `deepseek-v4-pro` 这类原始 ID。
+- 图表颜色不再随数据出现顺序漂移；API Key 颜色按名称排序稳定分配。
 
 ### v1.0.3
 

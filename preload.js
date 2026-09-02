@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   // 余额（主进程内缓存 + 去重）
   getBalance: () => ipcRenderer.invoke('balance:get'),
+  refreshPet: () => ipcRenderer.invoke('pet:refresh'),
   // 用量统计
   getUsageSummary: () => ipcRenderer.invoke('usage:summary'),
   getUsageDaily: (start, end) => ipcRenderer.invoke('usage:daily', { start, end }),

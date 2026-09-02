@@ -698,6 +698,12 @@ function registerIpc() {
     return payload
   })
 
+  // 设置窗「立即刷新余额」：除了取余额结果，还要触发鲸鱼窗口弹出气泡（与托盘行为一致）
+  ipcMain.handle('pet:refresh', async () => {
+    sendRefresh()
+    return await balanceService.getSnapshot(configMod.getEffective())
+  })
+
   // ---------- 用量同步 ----------
   ipcMain.handle('usage:sync', (e) => {
     const sender = e.sender
