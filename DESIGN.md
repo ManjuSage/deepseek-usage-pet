@@ -1,7 +1,7 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-09-02
+> 更新日期：2026-09-06
 
 ## 1. 项目定位
 
@@ -86,6 +86,8 @@ meta(key, value)                                                          -- 账
 15. **运行日志**：`lib/log.js` 写 `pet.log`，默认 info，`WHALE_PET_LOG_LEVEL`/`WHALE_PET_TRACE` 开 debug；`redact()` 掩码密钥；`config.readFile` 不打日志防递归。Windows 终端用 `chcp`+`iconv-lite` 按本机代码页编码，文件保持 UTF-8。
 16. **图表颜色统一**：`FIXED_COLORS` 给已知模型/类型/费用线固定色（Tableau 10 风格），未知模型与 API Key 从 `FALLBACK` 按名称排序分配；`rebuildColorMap()` 在加载日级/分时数据后重建。所有图表（每日走势/分时明细/饼图）统一走 `colorFor()`。
 17. **Linux AppImage 走 CI**：`.github/workflows/build-linux.yml` 在 `v*` tag 时用 Ubuntu runner 构建 AppImage 并挂到 Release；Windows 本机只出 Windows 产物。
+18. **「总体」时间范围**：预设按钮 `data-days="all"` 表示全部已记录数据，范围取 `getDateRange()`（`UNION ALL` 同时扫 `amount_daily` 与 `cost_daily`）。
+19. **热力图年份翻页**：`state.heatmapYear` 记录当前年，`heatmapRangeFor(year)` 补齐到完整周（周一~周日），使每年都是整周数、热力图呈规整长方形；`<`/`>` 按钮放在标题栏，避免挤占图表宽度。
 
 ## 7. 风险与缓解
 

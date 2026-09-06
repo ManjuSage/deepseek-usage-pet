@@ -72,6 +72,8 @@ test/               单元测试（node --test）
 18. **Windows 终端乱码**：中文 Windows 控制台是 GBK，直接 `console.log` 中文会乱码。`log.js` 用 `chcp` 检测代码页，`iconv-lite` 把终端回显按对应编码（gbk/big5/...）写字节；文件仍写 UTF-8。
 19. **用量图表颜色统一**：`renderer/usage.js` 里不再用「首次出现才分配」的 `modelColor()`。改为 `FIXED_COLORS`（已知模型/类型/费用线固定色，Tableau 10 风格）+ `FALLBACK`（未知模型/API Key 按名称排序分配）。分时明细的模型名也要先过 `modelLabel` 再取色，否则会出现 `deepseek-v4-pro` 与 `V4 Pro` 两个 key、颜色对不上。
 20. **Linux AppImage 用 CI 构建**：Windows 本机无法直接出 AppImage，`.github/workflows/build-linux.yml` 在推送 `v*` tag 时用 Ubuntu runner 跑 `electron-builder --linux AppImage`，并用 `softprops/action-gh-release` 挂到同名 Release。
+21. **「总体」时间范围**：预设按钮里 `data-days="all"` 表示全部已记录数据，范围取 `usage:summary` 返回的 `range`（`getDateRange()`）。`getDateRange()` 用 `UNION ALL` 同时扫 `amount_daily` 和 `cost_daily`，避免只有费用没有 token 的日期漏掉。
+22. **热力图年份翻页 + 补齐整周**：`state.heatmapYear` 记录当前查看的年份，`heatmapRangeFor(year)` 返回 `[1月1日前最近的周一, 12月31日后最近的周日]`，让每年都是整周数、热力图呈规整长方形。`<`/`>` 按钮放在标题栏 `.heatmap-nav-group` 里（不放图表两侧，避免挤压图表宽度导致标签被裁）。
 
 ## 打包与分发
 

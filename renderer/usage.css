@@ -178,6 +178,45 @@ body {
 .chart-lg { height: 360px; }
 .chart-md { height: 300px; }
 .chart-heat { height: 200px; }
+.heatmap-year {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.heatmap-nav-group {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.heatmap-nav {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.heatmap-nav:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.heatmap-nav:disabled {
+  opacity: .35;
+  cursor: default;
+}
+.heatmap-nav.hidden {
+  visibility: hidden;
+}
 @media (max-width: 900px) {
   .grid-2 { grid-template-columns: 1fr; }
 }

@@ -70,7 +70,9 @@
     hourlyDate: null,
     daily: null,
     heatmapData: null,
+    heatmapYear: null,
     range: { start: null, end: null },
+    fullRange: null,
     feeVisible: true,
   }
   var charts = {}
@@ -97,11 +99,23 @@
   function gmt8Date(offsetDays) {
     return new Date(Date.now() + 8 * 3600 * 1000 + offsetDays * 86400 * 1000).toISOString().slice(0, 10)
   }
-  function heatmapRange() {
-    var d = new Date(Date.now() + 8 * 3600 * 1000)
-    var dow = d.getUTCDay() || 7 // 1=周一 … 7=周日
-    var back = (dow - 1) + 51 * 7 // 回到 52 周前（含本周）的周一
-    return { start: gmt8Date(-back), end: gmt8Date(0) }
+  function currentHeatmapYear() {
+    return new Date(Date.now() + 8 * 3600 * 1000).getUTCFullYear()
+  }
+  function heatmapRangeFor(year) {
+    // 补齐到完整周：起点为 1 月 1 日前最近的周一，终点为 12 月 31 日后最近的周日，
+    // 让整年正好是整周数，热力图呈现规整长方形（补出来的前后几天无数据，显示为空白）。
+    var y = String(year)
+    var start = new Date(y + '-01-01T00:00:00Z')
+    var end = new Date(y + '-12-31T00:00:00Z')
+    var startDow = start.getUTCDay() || 7 // 1=周一 … 7=周日
+    var endDow = end.getUTCDay() || 7
+    start.setUTCDate(start.getUTCDate() - (startDow - 1))
+    end.setUTCDate(end.getUTCDate() + (7 - endDow))
+    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
+  }
+  function yearOf(dateStr) {
+    return dateStr ? Number(String(dateStr).slice(0, 4)) : null
   }
   function fmtTokens(n) {
     n = Number(n) || 0
@@ -306,7 +320,7 @@
     var chart = initChart('heatmapChart')
     if (!d) return
     var isCost = state.heatmapMetric === 'cost'
-    var r = heatmapRange()
+    var r = heatmapRangeFor(state.heatmapYear)
     var byDate = {}
     if (isCost) {
       ;(d.costTotals || []).forEach(function (r) { byDate[r.utc_date] = (byDate[r.utc_date] || 0) + (Number(r.cost) || 0) })
@@ -327,9 +341,23 @@
   }
 
   async function loadHeatmap() {
-    var r = heatmapRange()
+    var r = heatmapRangeFor(state.heatmapYear)
     state.heatmapData = await api.getUsageDaily(r.start, r.end)
     renderHeatmap()
+    renderHeatmapNav()
+  }
+
+  function renderHeatmapNav() {
+    var yearEl = document.getElementById('heatmapYear')
+    var prev = document.getElementById('heatmapPrev')
+    var next = document.getElementById('heatmapNext')
+    if (!yearEl || !prev || !next) return
+    var y = state.heatmapYear
+    var cy = currentHeatmapYear()
+    var ey = yearOf(state.fullRange && state.fullRange.min) || cy
+    yearEl.textContent = y + '年'
+    prev.disabled = y <= ey
+    next.classList.toggle('hidden', y >= cy)
   }
 
   function renderHourly(detail) {
@@ -378,8 +406,10 @@
     var r = await api.getUsageSummary()
     renderSummary(r.summary || {}, r.balance)
     displaySyncTime(r.lastSyncAt)
+    state.fullRange = r.range || null
     highlightPreset(7)
     setRange(gmt8Date(-6), gmt8Date(0))
+    if (state.heatmapYear === null) state.heatmapYear = currentHeatmapYear()
     loadHeatmap().catch(function (e) { console.error(e) })
   }
 
@@ -520,6 +550,20 @@
   bindSeg('heatmapMetricSeg', function (btn) { state.heatmapMetric = btn.dataset.metric; renderHeatmap() })
   bindSeg('hourlyViewSeg', function (btn) { state.hourlyView = btn.dataset.view; if (state.hourlyDate) loadHourly(state.hourlyDate) })
 
+  document.getElementById('heatmapPrev').addEventListener('click', function () {
+    var ey = yearOf(state.fullRange && state.fullRange.min) || currentHeatmapYear()
+    if (state.heatmapYear > ey) {
+      state.heatmapYear -= 1
+      loadHeatmap().catch(function (e) { console.error(e) })
+    }
+  })
+  document.getElementById('heatmapNext').addEventListener('click', function () {
+    if (state.heatmapYear < currentHeatmapYear()) {
+      state.heatmapYear += 1
+      loadHeatmap().catch(function (e) { console.error(e) })
+    }
+  })
+
   document.getElementById('hourlyClose').addEventListener('click', hideHourlyModal)
   document.getElementById('hourlyModal').addEventListener('click', function (e) {
     if (e.target === e.currentTarget) hideHourlyModal()
@@ -536,8 +580,9 @@
   var presetBtns = Array.prototype.slice.call(document.querySelectorAll('.preset-btn'))
   var rangeStart = document.getElementById('rangeStart')
   var rangeEnd = document.getElementById('rangeEnd')
-  function highlightPreset(days) {
-    presetBtns.forEach(function (btn) { btn.classList.toggle('active', Number(btn.dataset.days) === days) })
+  function highlightPreset(v) {
+    var key = String(v)
+    presetBtns.forEach(function (btn) { btn.classList.toggle('active', btn.dataset.days === key) })
   }
   function setRange(start, end) {
     rangeStart.value = start
@@ -546,8 +591,17 @@
   }
   presetBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var days = Number(btn.dataset.days) || 7
-      highlightPreset(days)
+      var key = btn.dataset.days
+      if (key === 'all') {
+        var r = state.fullRange
+        if (r && r.min && r.max) {
+          highlightPreset('all')
+          setRange(r.min, r.max)
+        }
+        return
+      }
+      var days = Number(key) || 7
+      highlightPreset(key)
       setRange(gmt8Date(-(days - 1)), gmt8Date(0))
     })
   })

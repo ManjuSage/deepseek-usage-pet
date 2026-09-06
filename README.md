@@ -6,25 +6,33 @@
 
 基于 [momo-OwO-qwq/DeepSeek-Whale-Pet](https://github.com/momo-OwO-qwq/DeepSeek-Whale-Pet)（MIT）二次开发的独立改版项目，已与原项目分离。其中**用量统计功能**参照 [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics)（Unlicense）实现。
 
+## 架构概览
+
+整体是一个 Electron 桌面应用，采用「**主进程（Node.js 特权）** + **渲染进程沙箱**（contextIsolation）」的双层结构，二者通过 `preload.js` 的 contextBridge（`window.whaleAPI`）安全通信。核心运行时包括：主进程 `main.js`（窗口 / 托盘 / IPC / 登录 / 同步）、官方余额 API 的 `BalanceService`、平台私有接口的 `UsageSync`、本地 **sql.js SQLite** 存储，以及桌宠 / 设置 / 用量统计三个渲染窗口。托盘、记账「对账取大」、启动自动同步、config 0600 等支持性细节放在底部卡片，未额外堆连线。外部依赖为 `api.deepseek.com`（余额）与 `platform.deepseek.com`（用量 / 令牌）。
+
+![仓库架构概览](docs/images/architecture.svg)
+
+> 上图由 [Archify] 基于仓库真实代码生成。
+
 ## 界面预览
 
 用量统计面板（`renderer/usage.*`）是「对账 + 用量可视化」的核心入口。以下截图展示了它在 Windows 上的实际效果（配色为 Tableau 10 风格调色板）。
 
-![登录平台获取令牌](docs/images/platform-token-login.png)
-
 用量统计需要**平台令牌**：点面板右上角「登录平台获取令牌」在弹出窗口登录后自动抓取，或点「手动粘贴令牌」在弹窗中粘贴 `userToken` 兜底。
 
-![用量统计总览](docs/images/usage-overview.png)
+![登录平台获取令牌](docs/images/platform-token-login.png)
 
 顶部卡片实时显示总 Tokens、缓存命中、缓存未命中、输出、请求次数、累计费用与充值余额；**每日用量走势**支持按模型 / 按计费类型 / 按 API Key 拆分，并可在 **Tokens / 费用** 两种指标间切换。
 
-![分时明细](docs/images/usage-hourly-detail.png)
+![用量统计总览](docs/images/usage-overview.png)
 
 点击每日走势的柱子可下钻当天的 **24 小时分时明细**：按模型拆分的柱状图 + 费用折线，悬停查看每个小时的 Tokens / 费用，并可继续按计费类型 / API Key 拆分。
 
-![用量趋势与热力图](docs/images/usage-trends.png)
+![分时明细](docs/images/usage-hourly-detail.png)
 
 **各模型占比**环形图、**累计趋势**与**用量热力图**一屏尽览，均跟随当前日期范围并可在 Tokens / 费用间切换；热力图按「周 × 天」网格展示历史用量，悬停即可查看某天的具体数字。
+
+![用量趋势与热力图](docs/images/usage-trends.png)
 
 
 ## 特性
@@ -187,6 +195,19 @@ npm run dist:linux # 打包 Linux 产物（AppImage/deb/rpm/tar.gz，需在 Linu
 | 内存优化 | — | — | **禁用硬件加速** + 设置窗口按需创建 |
 
 ## 更新日志
+
+### v1.0.5
+
+**新功能**
+
+- 用量统计新增「总体」时间范围：查看**全部已记录数据**（最早到最晚，含中间空档）。
+- 用量热力图新增**年份翻页**：标题栏右侧 `<` / `>` 可切换查看过去各年，默认当前年；热力图按完整周补齐，呈现规整长方形。
+- README 新增「架构概览」图（Archify 生成的架构图）。
+
+**修复**
+
+- 修复热力图左右边缘标签被裁切（「1月 / 12月」「星期一二三…」只显示一半）：日历改为补齐完整周、方块恢复 16px，`<`/`>` 按钮移到标题栏，日历恢复完整宽度。
+- `getDateRange()` 同时覆盖 `amount_daily` 与 `cost_daily`，避免只有费用、没有 token 的日期被漏掉。
 
 ### v1.0.4
 
