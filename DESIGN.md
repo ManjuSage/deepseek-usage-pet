@@ -1,7 +1,7 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-09-06
+> 更新日期：2026-09-07
 
 ## 1. 项目定位
 
@@ -80,7 +80,7 @@ meta(key, value)                                                          -- 账
 9. **启动自动同步**：启动 + 每小时检查，超 12h 做一次轻量同步（不含历史回填），`autoSync` 可关。
 10. **SQLite 批量落盘**：`beginBatch()/flush()` 让一次同步只落盘一次。
 11. **模型定价精确匹配**：未知模型走默认价；平台把旧版 chat/reasoner 合并为 `deepseek-chat & deepseek-reasoner`。
-12. **安全加固与 CSP 收紧**：密钥掩码、openPath 白名单、登录窗护栏、raw 留存上限、三页 `object-src/base-uri/connect-src 'none'`。
+12. **安全加固与 CSP 收紧**：密钥掩码、openPath 白名单、登录窗护栏（权限请求用 `session.setPermissionRequestHandler`）、raw 留存上限、三页 `object-src/base-uri/connect-src 'none'`。
 13. **镜像翻转**：`mirror` 默认开启，方向感知自动镜像（整窗 `scaleX(-1)`，鲸鱼+气泡一起翻、文字/动图反向翻回，旋转中心为两者合起来的中部）；关闭=锁定当前方向；重启回默认。
 14. **缩放/多屏适配**：小屏动态限制最大缩放；多显示器镜像锚点随屏更新；跨屏钳制统一 `getDisplayMatching`；缩放用一次原子 `setBounds`（避免 `setSize`+`setPosition` 竞态导致位移受限/漂移）。
 15. **运行日志**：`lib/log.js` 写 `pet.log`，默认 info，`WHALE_PET_LOG_LEVEL`/`WHALE_PET_TRACE` 开 debug；`redact()` 掩码密钥；`config.readFile` 不打日志防递归。Windows 终端用 `chcp`+`iconv-lite` 按本机代码页编码，文件保持 UTF-8。

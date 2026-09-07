@@ -196,6 +196,12 @@ npm run dist:linux # 打包 Linux 产物（AppImage/deb/rpm/tar.gz，需在 Linu
 
 ## 更新日志
 
+### v1.0.6
+
+**修复**
+
+- 修复「登录平台获取令牌」弹窗空白、无法登录的问题：权限请求处理器用错了 API（`webContents.setPermissionRequestHandler` 应为 `session.setPermissionRequestHandler`）。
+
 ### v1.0.5
 
 **新功能**

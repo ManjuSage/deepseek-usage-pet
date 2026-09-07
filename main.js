@@ -463,7 +463,7 @@ function openPlatformLogin() {
       if (/^https?:\/\//.test(url)) shell.openExternal(url)
       return { action: 'deny' }
     })
-    win.webContents.setPermissionRequestHandler((wc, permission, callback) => callback(false))
+    win.webContents.session.setPermissionRequestHandler((wc, permission, callback) => callback(false))
     win.webContents.on('will-navigate', (event, url) => {
       let host = ''
       try { host = new URL(url).hostname } catch (e) {}

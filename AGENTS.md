@@ -63,7 +63,7 @@ test/               单元测试（node --test）
 9. **启动自动同步**：启动时 + 每小时检查一次，距上次同步超 12h 且配置令牌就做一次「轻量同步」（近两天日级 + 今昨分时 + 余额，不含历史回填）；设置里 `autoSync` 可开关。
 10. **SQLite 批量落盘**：`store.beginBatch()/flush()` 让一次同步只全库导出落盘一次，避免每行写都 export。
 11. **模型定价精确匹配**：`priceFor` 精确匹配，未知模型走默认价并打英文日志（避免 GBK 终端乱码）。注意平台会把旧版 chat/reasoner 合并成 `deepseek-chat & deepseek-reasoner` 一个名字。
-12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。
+12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。注意权限请求处理器是 **`session.setPermissionRequestHandler`**（不是 `webContents` 的方法），写错会导致登录窗空白。
 13. **CSP 收紧**：pet/menu/usage 三页补 `object-src 'none'; base-uri 'none'; connect-src 'none'`。
 14. **鼠标穿透的平台差异**：Windows/macOS 用 `setIgnoreMouseEvents(true/false)`；Linux/X11 用 `setShape([])`（空 shape）穿透、关闭时恢复 `lastShapeRects`。**Wayland/XWayland 下两者都不可靠**（事件转发、光标位置有已知问题），需用户改回 X11 会话才能用。
 15. **镜像翻转语义**：`config.mirror` 默认开启。开启=方向感知自动镜像（窗口中心在左半屏 → 整窗 `scaleX(-1)`，鲸鱼+气泡一起翻、文字/动图再反向翻回）；关闭=锁定当前方向（`updateAnchor` 直接 return，不重置）。`flipped` 是运行时变量，不落盘，重启自然回默认（贴右缘、原方向）。
