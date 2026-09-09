@@ -80,6 +80,7 @@ test/               单元测试（node --test）
 - `build.win.target = ["nsis", "portable"]`：一次产出安装包 + 便携版。
 - 安装包：NSIS 向导式（`oneClick:false`），`perMachine:false` 提供「仅当前用户 / 所有用户」选择页，`installerLanguages: ["zh_CN", "en_US"]` 中文优先，可选安装目录 + 桌面/开始菜单快捷方式。
 - 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + zip + win-unpacked）。
+- **发布上传范围**：Release 只上传「安装包 Setup exe」+「便携版 zip」；**不上传便携版单文件 exe**。AppImage 由 CI 自动挂上。
 - Linux 产物：AppImage 由 GitHub Actions 在 `v*` tag 时自动构建并挂 Release（`softprops/action-gh-release`）；也可在 Linux 上手动 `npm run dist:linux`。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，需用户点「更多信息 → 仍要运行」。
 - 打包联网下载 NSIS 工具链 / Electron 用 npmmirror 镜像（直接 GitHub 可能失败）。
