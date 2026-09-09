@@ -1,7 +1,7 @@
 {
   "name": "deepseek-usage-pet",
   "productName": "DeepSeek Usage Pet",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "DeepSeek 桌面小鲸鱼桌宠：余额监控 + 用量统计面板（日级/分时图表、历史回填、充值余额、同步时间）",
   "main": "main.js",
   "author": {
@@ -51,7 +51,7 @@
       "icon": "assets/DSniang1.png",
       "category": "Utility",
       "synopsis": "DeepSeek 余额小鲸鱼桌宠",
-      "description": "DeepSeek 余额小鲸鱼桌宠：余额监控、今日已用记账、峰谷定价、随机台词与音效。"
+      "description": "DeepSeek 余额小鲸鱼桌宠：余额监控、今日已用记账、平台实际费用、随机台词与音效。"
     },
     "win": {
       "target": [

@@ -19,7 +19,7 @@
 main.js             Electron 主进程：窗口/托盘/IPC/登录/同步/记账
 preload.js          contextBridge 安全桥（window.whaleAPI）
 lib/
-  balance.js        官方余额 API + 峰谷定价 + BalanceService（TTL 缓存）
+  balance.js        官方余额 API + 平台实际费用 + BalanceService（TTL 缓存）
   config.js         配置读写（%APPDATA%/whale-pet/config.json，env 覆盖）
   ledger.js         「小鲸鱼记账」：余额差值累计今日用量
   lines.js          随机台词池（lines.json）
@@ -39,7 +39,7 @@ test/               单元测试（node --test）
 - **桌宠**：透明置顶、点击穿透（setShape 只保留鲸鱼/气泡/按钮）、拖拽、Q 弹、低余额提醒、随机台词、峰谷提示、方向感知镜像（设置可开关）
 - **托盘**：「显示鲸鱼」「鼠标穿透」勾选状态、立即刷新、打开设置、用量统计、开机自启、退出
 - **设置**：API Key、平台令牌（自动登录提取）、主题、大小、音效、图片、台词、镜像翻转开关、打开日志
-- **用量统计**：历史日级回填、近 7/30/90/365 天或自定义日期、每日用量走势（按模型/按计费类型/按 API Key，且支持 Tokens/费用切换）+ 各模型占比饼图 + 累计趋势 + 用量热力图 + 点击看分时明细（弹窗）、充值余额卡片、上次同步时间（GMT+8）
+- **用量统计**：历史日级回填、近 7/30/90/365 天或自定义日期、输入缓存命中率总览、每日用量走势（按模型/按计费类型/按 API Key，且支持 Tokens/费用/缓存命中率切换）+ 各模型占比饼图 + 累计趋势 + 用量热力图 + 点击看分时明细（弹窗）、充值余额卡片、上次同步时间（GMT+8）
 
 ## 数据与存储
 
@@ -62,7 +62,7 @@ test/               单元测试（node --test）
 8. **记账模式「对账取大」**：配置了平台令牌时，记账模式每次刷新用「余额差值 vs 平台今日用量」取较大值，补齐未运行期间的花费；未配令牌则只有余额差值（会漏掉当天首次启动前已产生的花费）。
 9. **启动自动同步**：启动时 + 每小时检查一次，距上次同步超 12h 且配置令牌就做一次「轻量同步」（近两天日级 + 今昨分时 + 余额，不含历史回填）；设置里 `autoSync` 可开关。
 10. **SQLite 批量落盘**：`store.beginBatch()/flush()` 让一次同步只全库导出落盘一次，避免每行写都 export。
-11. **模型定价精确匹配**：`priceFor` 精确匹配，未知模型走默认价并打英文日志（避免 GBK 终端乱码）。注意平台会把旧版 chat/reasoner 合并成 `deepseek-chat & deepseek-reasoner` 一个名字。
+11. **费用以平台账单为准**：桌宠“今日已用”直接汇总平台 `/api/v0/usage/by_api_key/cost` 的实际费用，不再用 token 数量乘本地价目表；因此能自动适应价格调整和 Pro→Flash 等模型路由变化。接口失败时沿用余额差值记账回退。
 12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。注意权限请求处理器是 **`session.setPermissionRequestHandler`**（不是 `webContents` 的方法），写错会导致登录窗空白。
 13. **CSP 收紧**：pet/menu/usage 三页补 `object-src 'none'; base-uri 'none'; connect-src 'none'`。
 14. **鼠标穿透的平台差异**：Windows/macOS 用 `setIgnoreMouseEvents(true/false)`；Linux/X11 用 `setShape([])`（空 shape）穿透、关闭时恢复 `lastShapeRects`。**Wayland/XWayland 下两者都不可靠**（事件转发、光标位置有已知问题），需用户改回 X11 会话才能用。
@@ -108,7 +108,7 @@ test/               单元测试（node --test）
 - `package.json` 与 `package-lock.json` 的 `version`
 - GitHub Release 标签与说明
 
-> 历史说明：`1.0.6` 及之前（`0.1.0 → 1.0.0 → 1.0.6`）未严格遵循 SemVer（新增功能也用了 PATCH 位）。为遵循规范，下一版直接跳到 `1.1.0`（MINOR），不回改已发布的历史标签。
+> 历史说明：`1.0.6` 及之前（`0.1.0 → 1.0.0 → 1.0.6`）未严格遵循 SemVer（新增功能也用了 PATCH 位）。项目已从 `1.1.0` 起按上述规则发布，不回改历史标签。
 
 ## 常用命令
 

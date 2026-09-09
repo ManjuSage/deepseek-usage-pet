@@ -350,7 +350,7 @@ function broadcast(channel, payload) {
     try {
       if (!w || w.isDestroyed()) continue
       if (channel === 'config:changed') {
-        // 设置窗收完整配置，鲸鱼/用量窗收掩码后的配置（缩小密钥暴露面）
+        // 设置窗收完整配置，鲸鱼窗收掩码后的配置（缩小密钥暴露面）
         w.webContents.send(channel, w === menuWin ? payload : maskSecrets(payload))
       } else {
         w.webContents.send(channel, payload)
@@ -770,7 +770,8 @@ function registerIpc() {
   ipcMain.handle('usage:hourly', (e, msg) => storeMod.getHourlyDetail((msg && msg.day) || '', (msg && msg.dim) || 'type'))
 
   // ---------- 平台令牌登录 ----------
-  ipcMain.handle('platform:login', async () => {
+  ipcMain.handle('platform:login', async (e) => {
+    if (!isMenuSender(e) && !isUsageSender(e)) return { ok: false, error: '无权限' }
     const token = await openPlatformLogin()
     if (!token) return { ok: false, error: '未获取到平台令牌' }
     configMod.save({ platformToken: token })

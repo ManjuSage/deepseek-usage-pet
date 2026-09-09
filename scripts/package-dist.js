@@ -17,7 +17,9 @@ const version = pkg.version
 function moveIfExists(src, dstDir) {
   if (!fs.existsSync(src)) return
   fs.mkdirSync(dstDir, { recursive: true })
-  fs.renameSync(src, path.join(dstDir, path.basename(src)))
+  const dst = path.join(dstDir, path.basename(src))
+  fs.rmSync(dst, { recursive: true, force: true })
+  fs.renameSync(src, dst)
 }
 
 function copyDir(src, dst) {
@@ -35,6 +37,7 @@ function zipDir(srcDir, zipPath, topName) {
   const staged = path.join(stageRoot, topName)
   copyDir(srcDir, staged)
   fs.mkdirSync(path.dirname(zipPath), { recursive: true })
+  fs.rmSync(zipPath, { force: true })
   if (process.platform === 'win32') {
     execFileSync('powershell', ['-NoProfile', '-Command',
       `Compress-Archive -Path "${staged}" -DestinationPath "${zipPath}" -CompressionLevel Optimal`], { stdio: 'inherit' })

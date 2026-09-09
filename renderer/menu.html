@@ -57,10 +57,10 @@
         <span class="wm-label">用量模式</span>
         <select id="wm-usage">
           <option value="ledger">小鲸鱼记账（余额差值，令牌可选）</option>
-          <option value="token">实时·令牌（平台接口，峰谷定价）</option>
+          <option value="token">实时·令牌（平台实际费用）</option>
         </select>
       </label>
-      <div class="wm-note wm-span">小鲸鱼记账（令牌可选）：本地按余额下降差值累计今日用量，只能统计「运行期间」观察到的花费，当天首次启动前已产生的花费无法计入（显示 0 或偏少）。若已配置平台令牌，会自动与平台今日用量对账、取两者较大值，补齐未运行期间的花费。实时·令牌：按峰谷单价换算，需平台令牌。</div>
+      <div class="wm-note wm-span">小鲸鱼记账（令牌可选）：本地按余额下降差值累计今日用量，只能统计「运行期间」观察到的花费，当天首次启动前已产生的花费无法计入（显示 0 或偏少）。若已配置平台令牌，会自动与平台今日实际费用对账、取两者较大值，补齐未运行期间的花费。实时·令牌：读取平台实际费用，需平台令牌。</div>
       <div class="wm-grid">
         <label class="wm-row">
           <span class="wm-label">自动刷新</span>

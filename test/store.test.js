@@ -10,6 +10,7 @@ const store = require('../lib/store')
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'whale-store-'))
 const DB = path.join(tmpDir, 'test.db')
 const DB2 = path.join(tmpDir, 'test2.db')
+const DB3 = path.join(tmpDir, 'test3.db')
 
 test('store: 建库 + upsert 去重 + 持久化重载 + meta', async () => {
   await store.init(DB)
@@ -67,16 +68,19 @@ test('store: 用量查询方法（daily/hourly/summary/range）', async () => {
   const totals = store.getDailyTotals('2026-08-28', '2026-08-28')
   assert.strictEqual(totals.length, 1)
   assert.strictEqual(totals[0].cache_hit, 1000)
+  assert.ok(Math.abs(totals[0].cache_hit_rate - 83.33333333333333) < 1e-9)
   assert.strictEqual(totals[0].requests, 3)
 
   const byModel = store.getDailyByModel('2026-08-28', '2026-08-28')
   assert.strictEqual(byModel.length, 1)
   assert.strictEqual(byModel[0].output, 50)
+  assert.ok(Math.abs(byModel[0].cache_hit_rate - 83.33333333333333) < 1e-9)
 
   const byKey = store.getDailyByKey('2026-08-28', '2026-08-28')
   assert.strictEqual(byKey.length, 1)
   assert.strictEqual(byKey[0].api_key_name, 'codex')
   assert.strictEqual(byKey[0].output, 50)
+  assert.ok(Math.abs(byKey[0].cache_hit_rate - 83.33333333333333) < 1e-9)
 
   const modelTotals = store.getModelTotals('2026-08-28', '2026-08-28')
   assert.strictEqual(modelTotals.length, 1)
@@ -116,10 +120,24 @@ test('store: 用量查询方法（daily/hourly/summary/range）', async () => {
   const summary = store.getSummary()
   assert.strictEqual(summary.tokens, 1250)
   assert.strictEqual(summary.requests, 3)
+  assert.ok(Math.abs(summary.cache_hit_rate - 83.33333333333333) < 1e-9)
   assert.strictEqual(summary.cost[0].cost, 1.5)
 
   const range = store.getDateRange()
   assert.strictEqual(range.min, '2026-08-28')
   assert.strictEqual(range.max, '2026-08-28')
+  store.close()
+})
+
+test('store: 无输入 token 时缓存命中率为空', async () => {
+  await store.init(DB3)
+  store.upsertAmounts([
+    { utc_date: '2026-08-29', model: 'deepseek-v4-pro', api_key_name: 'codex', type: 'output_tokens', amount: 50 },
+  ])
+
+  const totals = store.getDailyTotals('2026-08-29', '2026-08-29')
+  assert.strictEqual(totals.length, 1)
+  assert.strictEqual(totals[0].cache_hit_rate, null)
+  assert.strictEqual(store.getSummary().cache_hit_rate, null)
   store.close()
 })

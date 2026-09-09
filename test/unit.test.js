@@ -59,19 +59,6 @@ test('isPeakTime: 周末谷价生效分界（2026-08-23 起）', () => {
   assert.strictEqual(bal.isPeakTime(t(2026, 7, 29, 10, 0, 0)), false, '分界后周六 10:00 低谷')
 })
 
-// ---------- 定价表 ----------
-test('priceFor: 模型匹配与默认回落', () => {
-  assert.strictEqual(bal.priceFor('deepseek-v4-flash-vision-exp'), bal.BASE_PRICE)
-  assert.strictEqual(bal.priceFor('deepseek-v4-flash'), bal.BASE_PRICE)
-  assert.strictEqual(bal.priceFor('deepseek-v4-pro'), bal.PRO_PRICE)
-  assert.strictEqual(bal.priceFor('deepseek-chat'), bal.BASE_PRICE)
-  assert.strictEqual(bal.priceFor('deepseek-chat & deepseek-reasoner'), bal.BASE_PRICE)
-  assert.strictEqual(bal.priceFor('deepseek-v4.1-flash-expires-on-0910'), bal.BASE_PRICE)
-  assert.strictEqual(bal.priceFor('deepseek-v4.1-pro-expires-on-0910'), bal.PRO_PRICE)
-  assert.strictEqual(bal.priceFor('unknown-model-xyz'), bal.BASE_PRICE)
-  assert.strictEqual(bal.priceFor(''), bal.BASE_PRICE)
-})
-
 // ---------- balance_infos 选取 ----------
 test('pickBalanceInfo: 优先级 CNY>0 → 任意非零 → CNY → 第一项', () => {
   const infos = [
@@ -103,35 +90,6 @@ test('pickBalanceInfo: 优先级 CNY>0 → 任意非零 → CNY → 第一项', 
   ]
   assert.strictEqual(bal.pickBalanceInfo(infos4).currency, 'USD')
   assert.strictEqual(bal.pickBalanceInfo([]), null)
-})
-
-// ---------- 平台用量换算 ----------
-test('computeTodayUsage: 峰谷定价换算', () => {
-  const peak = Math.floor(Date.UTC(2026, 7, 17, 2, 0, 0) / 1000) // 北京时间 10:00 → 高峰
-  const off = Math.floor(Date.UTC(2026, 7, 17, 0, 0, 0) / 1000) // 北京时间 08:00 → 空闲
-  const mk = (time, hit, miss, out) => ({
-    model: 'deepseek-v4-flash',
-    buckets: [{ time, usage: { PROMPT_CACHE_HIT_TOKEN: hit, PROMPT_CACHE_MISS_TOKEN: miss, RESPONSE_TOKEN: out } }],
-  })
-  // 高峰 1M+1M+1M：0.10 + 3.00 + 9.00 = 12.10
-  let u = bal.computeTodayUsage({ data: { biz_data: { series: [mk(peak, 1e6, 1e6, 1e6)] } } })
-  assert.ok(Math.abs(u.amount - 12.1) < 1e-9, 'peak cost 12.1, got ' + u.amount)
-  // 空闲 1M+1M+1M：0.05 + 1.50 + 4.50 = 6.05
-  u = bal.computeTodayUsage({ data: { biz_data: { series: [mk(off, 1e6, 1e6, 1e6)] } } })
-  assert.ok(Math.abs(u.amount - 6.05) < 1e-9, 'off-peak cost 6.05, got ' + u.amount)
-  // pro 模型 3 倍：空闲 1M×3 → 0.15 + 4.5 + 13.5 = 18.15
-  const mkPro = (time, hit, miss, out) => ({
-    model: 'deepseek-v4-pro',
-    buckets: [{ time, usage: { PROMPT_CACHE_HIT_TOKEN: hit, PROMPT_CACHE_MISS_TOKEN: miss, RESPONSE_TOKEN: out } }],
-  })
-  u = bal.computeTodayUsage({ data: { series: [mkPro(off, 1e6, 1e6, 1e6)] } })
-  assert.ok(Math.abs(u.amount - 18.15) < 1e-9, 'pro off-peak 18.15, got ' + u.amount)
-  // 空数据
-  assert.strictEqual(bal.computeTodayUsage({}), null)
-  assert.strictEqual(bal.computeTodayUsage({ data: { biz_data: { series: [] } } }), null)
-  // 全 0 token 不算 found
-  u = bal.computeTodayUsage({ data: { biz_data: { series: [mk(peak, 0, 0, 0)] } } })
-  assert.strictEqual(u, null)
 })
 
 // ---------- fetchBalance（mock fetch） ----------

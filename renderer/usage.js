@@ -3,18 +3,18 @@
 //       累计趋势、热力图 + 分时下钻（按类型/模型/API Key）；处理范围选择、同步进度/取消。
 (function () {
   'use strict'
-  var api = window.whaleAPI
-
   // 统一颜色标准：已知模型/类型/费用线用固定颜色；未知模型与 API Key 按名称排序从兜底调色板分配。
   var FIXED_COLORS = {
     'Chat / Reasoner': '#59A14F',
     'V4 Flash': '#76B7B2',
+    'V4.1 Flash': '#76B7B2',
     'V4 Flash Vision': '#F28E2B',
     'V4 Pro': '#4E79A7',
     'Chat': '#B07AA1',
     'Reasoner': '#EDC948',
     '缓存命中': '#4E79A7',
     '缓存未命中': '#EDC948',
+    '输入缓存命中率': '#4E79A7',
     '输出': '#59A14F',
     '费用': '#E15759',
   }
@@ -57,8 +57,16 @@
       'deepseek-chat': 'Chat',
       'deepseek-reasoner': 'Reasoner',
     }
+    if (/^deepseek-v4\.1-flash(?:-|$)/.test(m)) return 'V4.1 Flash'
     return map[m] || m
   }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { modelLabel: modelLabel }
+    return
+  }
+
+  var api = window.whaleAPI
 
   var state = {
     dailyView: 'model',
@@ -119,9 +127,8 @@
   }
   function fmtTokens(n) {
     n = Number(n) || 0
-    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
-    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
-    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
+    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿'
+    if (n >= 1e4) return (n / 1e4).toFixed(2) + '万'
     return String(n)
   }
   function fmtTokensFull(n) {
@@ -133,8 +140,7 @@
   }
   function fmtMoneyShort(n) {
     n = Number(n) || 0
-    if (n >= 1e6) return '¥' + (n / 1e6).toFixed(2) + 'M'
-    if (n >= 1e3) return '¥' + (n / 1e3).toFixed(2) + 'K'
+    if (n >= 1e4) return '¥' + (n / 1e4).toFixed(2) + '万'
     return '¥' + n.toFixed(2)
   }
   function fmtCost(n) {
@@ -161,6 +167,7 @@
   function renderSummary(s, balance) {
     var cards = [
       ['总 Tokens', fmtTokens(s.tokens)],
+      ['输入缓存命中率', s.cache_hit_rate == null ? '—' : Number(s.cache_hit_rate).toFixed(1) + '%'],
       ['缓存命中', fmtTokens(s.cache_hit)],
       ['缓存未命中', fmtTokens(s.cache_miss)],
       ['输出', fmtTokens(s.output)],
@@ -196,9 +203,44 @@
     var dates = genDateRange(state.range.start, state.range.end)
     var view = state.dailyView
     var isCost = state.dailyMetric === 'cost'
+    var isRate = state.dailyMetric === 'cacheRate'
     var series
 
-    if (view === 'type') {
+    if (isRate) {
+      if (view === 'type') {
+        var rateByDate = {}
+        ;(d.totals || []).forEach(function (r) { rateByDate[r.utc_date] = r.cache_hit_rate })
+        series = [{
+          name: '输入缓存命中率', type: 'line', smooth: false, connectNulls: false,
+          lineStyle: { width: 2, color: colorFor('输入缓存命中率') },
+          itemStyle: { color: colorFor('输入缓存命中率') },
+          data: dates.map(function (dt) { return rateByDate[dt] == null ? null : rateByDate[dt] }),
+        }]
+      } else {
+        var rateRows = view === 'model' ? (d.byModel || []) : (d.byKey || [])
+        var rateNameOf = view === 'model'
+          ? function (r) { return modelLabel(r.model) }
+          : function (r) { return r.api_key_name || '(未命名)' }
+        var rateNames = []
+        var rateSeen = {}
+        var rateByDateName = {}
+        rateRows.forEach(function (r) {
+          var n = rateNameOf(r)
+          if (!rateSeen[n]) { rateSeen[n] = true; rateNames.push(n) }
+          rateByDateName[r.utc_date + '|' + n] = r.cache_hit_rate
+        })
+        series = rateNames.map(function (n) {
+          return {
+            name: n, type: 'line', smooth: false, connectNulls: false,
+            lineStyle: { width: 2, color: colorFor(n) }, itemStyle: { color: colorFor(n) },
+            data: dates.map(function (dt) {
+              var value = rateByDateName[dt + '|' + n]
+              return value == null ? null : value
+            }),
+          }
+        })
+      }
+    } else if (view === 'type') {
       if (isCost) {
         // 计费类型下费用无法按类型拆分，退化为一条「当日费用」折线。
         var costByDate = {}
@@ -239,14 +281,20 @@
       })
     }
 
-    var tooltip = tooltipCfg({ trigger: 'axis', confine: true, axisPointer: { type: 'shadow' } })
+    var tooltip = tooltipCfg({ trigger: 'axis', confine: true, axisPointer: { type: isRate ? 'line' : 'shadow' } })
     if (isCost) tooltip.valueFormatter = fmtCost
+    else if (isRate) tooltip.valueFormatter = function (v) { return v == null ? '—' : Number(v).toFixed(1) + '%' }
     chart.setOption({
       tooltip: tooltip,
       legend: { type: view === 'type' ? 'plain' : 'scroll', top: 0, textStyle: { color: T.muted } },
       grid: { left: 8, right: 12, top: 32, bottom: 32, containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { color: T.muted }, axisLine: { lineStyle: { color: T.border } }, axisTick: { lineStyle: { color: T.border } } },
-      yAxis: { type: 'value', name: isCost ? '费用(¥)' : 'tokens', nameTextStyle: { color: T.muted }, axisLabel: { color: T.muted, formatter: isCost ? function (v) { return '¥' + v } : fmtTokens }, splitLine: { lineStyle: { color: T.border } } },
+      yAxis: {
+        type: 'value', min: isRate ? 0 : null, max: isRate ? 100 : null,
+        name: isRate ? '命中率' : (isCost ? '费用(¥)' : 'tokens'), nameTextStyle: { color: T.muted },
+        axisLabel: { color: T.muted, formatter: isRate ? function (v) { return v + '%' } : (isCost ? function (v) { return '¥' + v } : fmtTokens) },
+        splitLine: { lineStyle: { color: T.border } },
+      },
       series: series,
     }, true)
     chart.off('click')
