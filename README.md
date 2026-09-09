@@ -45,6 +45,7 @@
 - 🧸 按压 Q 弹 + 音效、呼吸动画、闲置半透明
 - 💰 余额气泡：60 秒自动刷新、余额变化数字滚动、点击手动刷新、低余额系统通知
 - 💬 随机台词 + 峰谷提示：点击鲸鱼弹余额，点气泡默认显示峰谷状态（随机台词已降频）
+- 🎭 表情状态机：眨眼 / 生气（连点）/ 失望（空闲）/ 害羞（悬停）/ 疲惫（低余额换图 + 每 5 分钟提示），表情图与台词均可自定义
 
 ### 托盘
 
@@ -56,6 +57,7 @@
 
 - API Key、平台令牌（**自动登录提取** + 手动粘贴兜底）
 - 外观 / 文案 / 音效 / 图片 / 随机台词 / 主题 / **镜像翻转开关**
+- 表情：行为开关 / 表情图上传 / 台词编辑 / 触发与持续时间参数
 - 运行日志：`pet.log`（1MB 轮转），设置「数据」页可一键「打开日志」
 
 ### 用量统计（新增）
@@ -196,58 +198,14 @@ npm run dist:linux # 打包 Linux 产物（AppImage/deb/rpm/tar.gz，需在 Linu
 
 ## 更新日志
 
-### v1.0.6
-
-**修复**
-
-- 修复「登录平台获取令牌」弹窗空白、无法登录的问题：权限请求处理器用错了 API（`webContents.setPermissionRequestHandler` 应为 `session.setPermissionRequestHandler`）。
-
-### v1.0.5
-
-**新功能**
-
-- 用量统计新增「总体」时间范围：查看**全部已记录数据**（最早到最晚，含中间空档）。
-- 用量热力图新增**年份翻页**：标题栏右侧 `<` / `>` 可切换查看过去各年，默认当前年；热力图按完整周补齐，呈现规整长方形。
-- README 新增「架构概览」图（Archify 生成的架构图）。
-
-**修复**
-
-- 修复热力图左右边缘标签被裁切（「1月 / 12月」「星期一二三…」只显示一半）：日历改为补齐完整周、方块恢复 16px，`<`/`>` 按钮移到标题栏，日历恢复完整宽度。
-- `getDateRange()` 同时覆盖 `amount_daily` 与 `cost_daily`，避免只有费用、没有 token 的日期被漏掉。
-
-### v1.0.4
-
-**新功能**
-
-- 用量统计图表配色统一：模型 / 类型 / API Key 改为固定映射（Tableau 10 风格），每日走势、分时明细、饼图跨图颜色一致。
-- 设置里的「立即刷新余额」现在也会弹出鲸鱼余额气泡（与托盘「立即刷新余额」行为一致）。
-- 新增 Linux **AppImage** 自动构建（GitHub Actions），发布时随 Windows 产物一起提供。
-
-**修复**
-
-- 分时明细的模型名改为友好名（`V4 Pro` / `V4 Flash` 等），与每日走势、饼图一致，不再显示 `deepseek-v4-pro` 这类原始 ID。
-- 图表颜色不再随数据出现顺序漂移；API Key 颜色按名称排序稳定分配。
-
-### v1.0.3
-
-**新功能**
-
-- 「镜像翻转」开关：设置里可开启/关闭；开启时随屏幕位置自动镜像，关闭时锁定当前方向，重启恢复默认。
-- 运行日志系统：写入 `pet.log`（1MB 轮转），自动掩码 API Key / 平台令牌；设置「数据」页新增「打开日志」按钮。
-
-**修复**
-
-- 镜像改为「鲸鱼 + 气泡整体」翻转、旋转中心为两者合起来的中部，修复镜像后贴边漂移、被裁切的问题。
-- 修复缩放后位移受限（被限制在某个长方形区域）与缩小后漂移：小屏动态限制最大缩放、多显示器锚点随屏更新、跨屏钳制统一、缩放改用一次原子 `setBounds`。
-- 修复 Windows 终端中文日志乱码：终端回显按本机控制台代码页编码，日志文件保持 UTF-8。
-- 移除 `main.js` 里 `WHALE_PET_TRACE` 守卫下的 `[trace] tick/delta` 调试日志。
+详细版本历史见 [CHANGELOG.md](CHANGELOG.md)。安全漏洞报告见 [SECURITY.md](SECURITY.md)。
 
 ## 许可证
 
-MIT License，见 [LICENSE](LICENSE)。鲸鱼素材与音效沿用原项目。
+MIT License，见 [LICENSE](LICENSE)。鲸鱼素材与音效沿用原项目；桌宠表情图（`assets/expressions/` 下的按压/生气/失望/害羞/疲惫/眨眼帧）取自父项目 [MeteorNOX/DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget) 的 `For–WinDesktop` 分支，沿用其 MIT 许可。
 
 ## 参考项目
 
-- [MeteorNOX/DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)（MIT）：DSH Web 插件，鲸鱼余额挂件的原始来源
+- [MeteorNOX/DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)（MIT）：DSH Web 插件，鲸鱼余额挂件的原始来源（其 `For–WinDesktop` 分支提供了桌宠表情素材与状态机参考）
 - [momo-OwO-qwq/DeepSeek-Whale-Pet](https://github.com/momo-OwO-qwq/DeepSeek-Whale-Pet)（MIT）：基于上述挂件实现的独立桌宠版，本项目在此基础上改版
 - [33March7/deepseek-api-usage-statistics](https://github.com/33March7/deepseek-api-usage-statistics)（Unlicense）：用量统计的私有接口与存储 schema

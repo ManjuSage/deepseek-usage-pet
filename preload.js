@@ -40,12 +40,14 @@ contextBridge.exposeInMainWorld('whaleAPI', {
   resetSound: (which) => ipcRenderer.invoke('sound:reset', { which }),
   // 自定义随机台词/动图（~/.config/whale-pet/lines.json，含默认池）
   getCustom: () => ipcRenderer.invoke('custom:get'),
-  reloadCustom: () => ipcRenderer.invoke('custom:reload'),
+  saveCustom: (data) => ipcRenderer.invoke('custom:save', data),
   // 设置窗口
   openMenu: () => ipcRenderer.send('menu:open'),
   closeMenu: () => ipcRenderer.send('menu:close'),
   // 用系统默认程序打开文件/目录/URL
   openPath: (path) => ipcRenderer.invoke('shell:open-path', { path }),
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', { url }),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
   // 打开运行日志文件
   openLog: () => ipcRenderer.invoke('log:open'),
   // 事件

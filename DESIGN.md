@@ -1,7 +1,8 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-09-07
+> 更新日期：2026-09-09
+> 版本历史：见 [CHANGELOG.md](CHANGELOG.md)
 
 ## 1. 项目定位
 

@@ -23,7 +23,17 @@
   var ANIM_MS = 700
   var CHANGE_MS = 900
   var BUBBLE_MS = 5000
+  var SNAP_MARGIN = 28
   var IDLE_MS = 3000
+  // 表情状态机常量（阶段 A：眨眼 / 失望 / 生气）
+  var BLINK_HALF_CLOSED_MS = 70
+  var BLINK_CLOSE_MS = 150
+  var BLINK_HALF_OPEN_MS = 70
+  var LONELY_CAROUSEL_MS = 30000
+  var HIGH_FREQ_WINDOW_MS = 10000
+  var HIGH_FREQ_GAP_MS = 500
+  var HIGH_FREQ_WARN_COUNT = 5
+  var HIGH_FREQ_COUNT = 18
 
   // ------------------------------------------------------------------ DOM
   var root = document.createElement('div')
@@ -41,13 +51,7 @@
   img.alt = 'DeepSeek 余额'
   img.draggable = false
 
-  // 预警徽标（默认隐藏；达到预警额度且开启预警换图时显示）
-  var alertBadge = document.createElement('div')
-  alertBadge.className = 'wp-alert-badge'
-  alertBadge.textContent = '!'
-
   breath.appendChild(img)
-  breath.appendChild(alertBadge)
 
   var bubbleBox = document.createElement('div')
   bubbleBox.className = 'wp-bubble'
@@ -121,6 +125,7 @@
   var settleTimer = null
   var drag = null
   var bubbleShown = false
+  var bubbleFadingOut = false
   var bubbleTimer = null
   var bubbleRandomActive = false
   var bubbleRandomLines = null
@@ -142,13 +147,12 @@
   var mirror = true
   var refreshIntervalMs = 60000
   var threshold = 10
-  var alertImage = false
   var mainImgPath = 'assets/DSniang1.png'
-  var alertImgPath = 'assets/DSniang03.png'
   var bubbleTextOk = 'DeepSeek 余额'
   var bubbleTextLow = '余额预警'
   var textColorOk = ''
   var textColorLow = ''
+  var bubbleColor = '#203170'
   var peakTextOff = ''
   var peakTextOn = ''
   var pressSound = ''
@@ -157,8 +161,44 @@
   var currentImgSrc = ''
   var lastPointerMoveAt = Date.now()
   var flipped = false
+  // 表情状态机
+  var mood = 'normal' // normal | angry | disappointed | shy | exhausted
+  var blinking = false
+  var blinkFrameSrc = ''
+  var exprImages = {
+    press: '', angry: '', disappointed: '', shy: '', exhausted: '',
+    blinkHalf: '', blinkClosed: '', blinkHalfOpen: '',
+  }
+  var exprEnabled = { blink: true, angry: true, disappointed: true, shy: true, exhausted: true }
+  var exprLines = { angryWarn: [], disappointedEntry: [], lonely: [], shy: [], exhausted: [] }
+  var blinkMinMs = 4000
+  var blinkMaxMs = 6000
+  var idleToDisappointedMs = 180000
+  var angryDurationMs = 5000
+  var blinkTimer = null
+  var blinkFrameTimer = null
+  var moodTimer = null
+  var lonelyCarouselTimer = null
+  var disappointedTimer = null
+  var clickLog = []
+  var hoverTimer = null
+  var isHovering = false
+  var hoverToShyMs = 1500
+  var shyDurationMs = 10000
+  var shyLinePending = false
+  var shyEndsAt = 0
+  var exhaustedPromptMs = 300000
+  var exhaustedPromptTimer = null
+  var exhaustedPromptIndex = 0
 
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
+
+  // 拖拽吸附：只有距离某条屏幕边很近（SNAP_MARGIN 以内）才贴边，不做“二分之一”整屏判定
+  function snapToEdge(v, lo, hi) {
+    if (v - lo <= SNAP_MARGIN) return lo
+    if (hi - v <= SNAP_MARGIN) return hi
+    return v
+  }
 
   // ------------------------------------------------------------- 气泡
   function fmt(balance, currency) {
@@ -360,6 +400,17 @@
   }
 
   function hideBubble() {
+    // 害羞台词因余额展示被暂缓：余额气泡到点时切换为害羞台词，而非直接关闭
+    if (mood === 'shy' && shyLinePending) {
+      shyLinePending = false
+      var line = pickExprLine('shy')
+      if (line) {
+        var remaining = shyEndsAt - Date.now()
+        if (remaining < 500) remaining = 500
+        showMoodLine(line, remaining)
+        return
+      }
+    }
     if (bubbleTimer) { clearTimeout(bubbleTimer); bubbleTimer = null }
     if (bubbleSwapTimer) { clearTimeout(bubbleSwapTimer); bubbleSwapTimer = null }
     if (hintFadeTimer) { clearTimeout(hintFadeTimer); hintFadeTimer = null }
@@ -371,10 +422,12 @@
     bubbleRandomActive = false
     bubbleRandomLines = null
     bubbleShown = false
+    bubbleFadingOut = true
     bubbleBox.classList.remove('wp-bubble-open')
     // 等气泡淡出动画结束（约 500ms）再裁剪窗口，避免气泡被矩形边界硬切
     shapeTimer = setTimeout(function () {
       shapeTimer = null
+      bubbleFadingOut = false
       reportShape()
     }, 520)
     gifFadeTimer = setTimeout(function () {
@@ -444,11 +497,12 @@
       setHint(hint)
       setStateLabel()
     }
-    updateHeroImage()
+    syncExhaustedMode()
+    syncExpression()
   }
 
   function isLowBalance() {
-    return state.status === 'ok' && state.balance !== null && isFinite(state.balance) &&
+    return state.balance !== null && isFinite(state.balance) &&
       state.balance >= 0 && state.balance < threshold
   }
 
@@ -459,6 +513,12 @@
     var c = low ? textColorLow : textColorOk
     if (labelEl.textContent !== t) labelEl.textContent = t
     if (labelEl.style.color !== c) labelEl.style.color = c
+  }
+
+  // 气泡描边（SVG 三个形状共用同一描边色），由色相滑条写入 config.bubbleColor 驱动
+  function applyBubbleStroke(color) {
+    var els = bubbleBox.querySelectorAll('.wp-bshape, .wp-b1, .wp-b2')
+    for (var i = 0; i < els.length; i++) els[i].setAttribute('stroke', color)
   }
 
   // 自定义随机台词/动图池（~/.config/whale-pet/lines.json，含全部默认值）
@@ -483,16 +543,314 @@
     return s.indexOf('assets/') === 0 ? '../' + s : '../' + s
   }
 
-  // 主图/预警图二选一：预警换图开启且余额低于阈值 → 预警图；否则主图
+  // 主图（低余额换图已合并到「疲惫表情」，不再走 alertImage/alertImgPath）
   function updateHeroImage() {
-    var low = alertImage && isLowBalance()
-    var want = low ? resolveImgPath(alertImgPath) : resolveImgPath(mainImgPath)
+    var want = resolveImgPath(mainImgPath)
     if (want && want !== currentImgSrc) {
       currentImgSrc = want
       img.src = want
       setupHitTest(want)
     }
-    alertBadge.classList.toggle('wp-alert-badge-show', !!low)
+  }
+
+  // ------------------------------------------------------------- 表情状态机（阶段 A）
+  // 图片优先级：mood > 按压 > 眨眼 > 主图/预警。
+  function syncExpression() {
+    var src = ''
+    if (mood === 'angry') src = exprImages.angry
+    else if (mood === 'disappointed') src = exprImages.disappointed
+    else if (mood === 'shy') src = exprImages.shy
+    else if (mood === 'exhausted') src = exprImages.exhausted
+    else if (pressing && exprImages.press) src = exprImages.press
+    else if (blinking && blinkFrameSrc) src = blinkFrameSrc
+
+    if (src) {
+      var resolved = resolveImgPath(src)
+      if (resolved && resolved !== currentImgSrc) {
+        currentImgSrc = resolved
+        img.src = resolved
+      }
+    } else {
+      updateHeroImage()
+    }
+  }
+
+  function pickExprLine(key) {
+    var arr = exprLines[key]
+    return (Array.isArray(arr) && arr.length) ? arr[Math.floor(Math.random() * arr.length)] : ''
+  }
+
+  function showMoodLine(text, durationMs) {
+    if (!text || !bubbleOn || passthrough) return
+    var lines = singleCenter('A', text, '', true)
+    bubbleRandomActive = true
+    bubbleRandomLines = lines
+    if (bubbleShown) {
+      swapBubbleContent(function () { applyBubbleLines(lines) })
+    } else {
+      bubbleShown = true
+      bubbleBox.classList.add('wp-bubble-open')
+      applyBubbleLines(lines)
+      reportShape()
+    }
+    if (bubbleTimer) { clearTimeout(bubbleTimer); bubbleTimer = null }
+    bubbleTimer = setTimeout(hideBubble, durationMs || BUBBLE_MS)
+  }
+
+  // 非点击触发的表情台词：余额气泡正在展示时跳过，避免覆盖余额。
+  // 点击触发的生气警告（enterAngry / 高频点击警告）仍直接覆盖，作为对点击的回应。
+  function showMoodLineUnlessBalance(text, durationMs) {
+    if (bubbleShown && !bubbleRandomActive) return
+    showMoodLine(text, durationMs)
+  }
+
+  function clearMoodTimers() {
+    if (moodTimer) { clearTimeout(moodTimer); moodTimer = null }
+    if (lonelyCarouselTimer) { clearInterval(lonelyCarouselTimer); lonelyCarouselTimer = null }
+  }
+
+  function cancelBlink(restore) {
+    if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null }
+    if (blinkFrameTimer) { clearTimeout(blinkFrameTimer); blinkFrameTimer = null }
+    blinking = false
+    blinkFrameSrc = ''
+    if (restore) syncExpression()
+  }
+
+  function scheduleNextBlink() {
+    cancelBlink(false)
+    if (mood !== 'normal' || pressing || !exprEnabled.blink) return
+    var min = Math.max(1000, blinkMinMs)
+    var max = Math.max(min, blinkMaxMs)
+    blinkTimer = setTimeout(function () {
+      blinkTimer = null
+      startBlink()
+    }, min + Math.random() * (max - min))
+  }
+
+  function startBlink() {
+    if (mood !== 'normal' || pressing || !exprEnabled.blink) { scheduleNextBlink(); return }
+    blinking = true
+    blinkFrameSrc = exprImages.blinkHalf
+    syncExpression()
+    blinkFrameTimer = setTimeout(function () {
+      blinkFrameTimer = null
+      if (!blinking || mood !== 'normal' || pressing) { cancelBlink(true); return }
+      blinkFrameSrc = exprImages.blinkClosed
+      syncExpression()
+      blinkFrameTimer = setTimeout(function () {
+        blinkFrameTimer = null
+        if (!blinking || mood !== 'normal' || pressing) { cancelBlink(true); return }
+        blinkFrameSrc = exprImages.blinkHalfOpen
+        syncExpression()
+        blinkFrameTimer = setTimeout(function () {
+          blinkFrameTimer = null
+          blinking = false
+          blinkFrameSrc = ''
+          syncExpression()
+          scheduleNextBlink()
+        }, BLINK_HALF_OPEN_MS)
+      }, BLINK_CLOSE_MS)
+    }, BLINK_HALF_CLOSED_MS)
+  }
+
+  function enterDisappointed() {
+    if (mood !== 'normal') return
+    mood = 'disappointed'
+    cancelBlink(false)
+    clearMoodTimers()
+    syncExpression()
+    var entry = pickExprLine('disappointedEntry')
+    if (entry) showMoodLineUnlessBalance(entry)
+    lonelyCarouselTimer = setInterval(function () {
+      var line = pickExprLine('lonely')
+      if (line) showMoodLineUnlessBalance(line)
+    }, LONELY_CAROUSEL_MS)
+    clickLog = []
+  }
+
+  function exitDisappointed() {
+    if (mood !== 'disappointed') return
+    mood = 'normal'
+    clearMoodTimers()
+    syncExpression()
+    resetExpressionIdle()
+    scheduleNextBlink()
+  }
+
+  function enterAngry() {
+    if (mood !== 'normal') return
+    mood = 'angry'
+    cancelBlink(false)
+    clearMoodTimers()
+    syncExpression()
+    var warn = pickExprLine('angryWarn')
+    if (warn) showMoodLine(warn, angryDurationMs)
+    moodTimer = setTimeout(function () {
+      moodTimer = null
+      exitAngry()
+    }, angryDurationMs)
+    clickLog = []
+  }
+
+  function exitAngry() {
+    if (mood !== 'angry') return
+    mood = 'normal'
+    clearMoodTimers()
+    syncExpression()
+    resetExpressionIdle()
+    scheduleNextBlink()
+  }
+
+  function clearHoverTimer() {
+    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
+    isHovering = false
+  }
+
+  function enterShy() {
+    if (mood !== 'normal') return
+    mood = 'shy'
+    cancelBlink(false)
+    clearHoverTimer()
+    clearMoodTimers()
+    syncExpression()
+    shyEndsAt = Date.now() + shyDurationMs
+    var shyLine = pickExprLine('shy')
+    if (shyLine) {
+      if (bubbleShown && !bubbleRandomActive) {
+        shyLinePending = true   // 余额气泡展示中：暂缓台词，等余额消失后再补
+      } else {
+        shyLinePending = false
+        showMoodLine(shyLine, shyDurationMs)
+      }
+    } else {
+      shyLinePending = false
+    }
+    moodTimer = setTimeout(function () {
+      moodTimer = null
+      exitShy()
+    }, shyDurationMs)
+    clickLog = []
+  }
+
+  function exitShy() {
+    if (mood !== 'shy') return
+    mood = 'normal'
+    clearMoodTimers()
+    shyLinePending = false
+    syncExpression()
+    resetExpressionIdle()
+    scheduleNextBlink()
+  }
+
+  function enterExhausted() {
+    if (mood === 'exhausted') return
+    mood = 'exhausted'
+    cancelBlink(false)
+    clearHoverTimer()
+    clearMoodTimers()
+    syncExpression()
+    // 进入低余额时立即提示一句，之后由 scheduleNextExhaustedPrompt 每 5 分钟轮播
+    var line = pickExprLine('exhausted')
+    if (line) showMoodLine(line)
+    scheduleNextExhaustedPrompt()
+    clickLog = []
+  }
+
+  function exitExhausted() {
+    if (mood !== 'exhausted') return
+    mood = 'normal'
+    clearMoodTimers()
+    pauseExhaustedPrompts()
+    syncExpression()
+    resetExpressionIdle()
+    scheduleNextBlink()
+  }
+
+  function syncExhaustedMode() {
+    if (!exprEnabled.exhausted) {
+      if (mood === 'exhausted') exitExhausted()
+      return
+    }
+    if (mood === 'exhausted') {
+      if (!isLowBalance()) exitExhausted()
+      return
+    }
+    if (isLowBalance()) enterExhausted()
+  }
+
+  function pauseExhaustedPrompts() {
+    if (exhaustedPromptTimer) { clearTimeout(exhaustedPromptTimer); exhaustedPromptTimer = null }
+  }
+
+  function scheduleNextExhaustedPrompt() {
+    pauseExhaustedPrompts()
+    if (mood !== 'exhausted') return
+    exhaustedPromptTimer = setTimeout(function () {
+      exhaustedPromptTimer = null
+      if (mood !== 'exhausted') return
+      var line = pickExprLine('exhausted')
+      if (line) showMoodLineUnlessBalance(line)
+      scheduleNextExhaustedPrompt()
+    }, exhaustedPromptMs)
+  }
+
+  function resetExpressionIdle() {
+    if (disappointedTimer) { clearTimeout(disappointedTimer); disappointedTimer = null }
+    if (mood !== 'normal' || !exprEnabled.disappointed) return
+    disappointedTimer = setTimeout(function () {
+      disappointedTimer = null
+      enterDisappointed()
+    }, idleToDisappointedMs)
+  }
+
+  function handleWhaleClick() {
+    resetExpressionIdle()
+    if (mood === 'disappointed') { exitDisappointed(); showBubble(); refresh(true); return }
+    if (mood === 'shy') { exitShy(); showBubble(); refresh(true); return }
+    if (mood === 'angry' || mood === 'exhausted') { showBubble(); refresh(true); return }
+
+    var now = Date.now()
+    if (clickLog.length && now - clickLog[clickLog.length - 1] > HIGH_FREQ_GAP_MS) clickLog = []
+    clickLog.push(now)
+    while (clickLog.length && now - clickLog[0] > HIGH_FREQ_WINDOW_MS) clickLog.shift()
+
+    if (clickLog.length >= HIGH_FREQ_COUNT) {
+      clickLog = []
+      enterAngry()
+      return
+    }
+    if (clickLog.length >= HIGH_FREQ_WARN_COUNT) {
+      var warn = pickExprLine('angryWarn')
+      if (warn) showMoodLine(warn)
+      return
+    }
+    showBubble()
+    refresh(true)
+  }
+
+  function applyExpressionConfig(ex) {
+    if (!ex || typeof ex !== 'object') return
+    var imgs = ex.images && typeof ex.images === 'object' ? ex.images : {}
+    var en = ex.enabled && typeof ex.enabled === 'object' ? ex.enabled : {}
+    var ln = ex.lines && typeof ex.lines === 'object' ? ex.lines : {}
+    for (var k in exprImages) if (typeof imgs[k] === 'string' && imgs[k].trim()) exprImages[k] = imgs[k].trim()
+    for (var k2 in exprEnabled) if (typeof en[k2] === 'boolean') exprEnabled[k2] = en[k2]
+    if (ex.masterEnabled === false) {
+      for (var k2b in exprEnabled) exprEnabled[k2b] = false
+    }
+    for (var k3 in exprLines) if (Array.isArray(ln[k3]) && ln[k3].length) exprLines[k3] = ln[k3]
+    blinkMinMs = (typeof ex.blinkMinSec === 'number' && ex.blinkMinSec > 0) ? Math.round(ex.blinkMinSec * 1000) : 4000
+    blinkMaxMs = (typeof ex.blinkMaxSec === 'number' && ex.blinkMaxSec > 0) ? Math.round(ex.blinkMaxSec * 1000) : 6000
+    idleToDisappointedMs = (typeof ex.idleToDisappointedSec === 'number' && ex.idleToDisappointedSec > 0) ? Math.round(ex.idleToDisappointedSec * 1000) : 180000
+    angryDurationMs = (typeof ex.angryDurationMs === 'number' && ex.angryDurationMs > 0) ? Math.round(ex.angryDurationMs) : 5000
+    hoverToShyMs = (typeof ex.hoverToShyMs === 'number' && ex.hoverToShyMs > 0) ? Math.round(ex.hoverToShyMs) : 1500
+    shyDurationMs = (typeof ex.shyDurationMs === 'number' && ex.shyDurationMs > 0) ? Math.round(ex.shyDurationMs) : 10000
+    exhaustedPromptMs = (typeof ex.exhaustedPromptSec === 'number' && ex.exhaustedPromptSec > 0) ? Math.round(ex.exhaustedPromptSec * 1000) : 300000
+    // 开关/总开关关闭时，立即退出对应表情（疲惫由 syncExhaustedMode 处理）
+    if (!exprEnabled.disappointed && mood === 'disappointed') exitDisappointed()
+    if (!exprEnabled.angry && mood === 'angry') exitAngry()
+    if (!exprEnabled.shy && mood === 'shy') exitShy()
   }
 
   async function refresh(manual) {
@@ -616,7 +974,7 @@
           p(img.offsetLeft - pad, img.offsetTop - pad, w + pad * 2, img.offsetHeight + pad * 2)
         }
       }
-      if (bubbleShown) {
+      if (bubbleShown || bubbleFadingOut) {
         var b = bubbleBox.offsetWidth
         if (b > 0) {
           // 气泡贴合椭圆轮廓（去掉四角与右侧透明区）
@@ -772,6 +1130,7 @@
 
   function onDocPointerMove(e) {
     lastPointerMoveAt = Date.now()
+    resetExpressionIdle()
     if (drag && drag.active) {
       var mx = e.movementX
       var my = e.movementY
@@ -789,6 +1148,19 @@
     var over = inClickable(e)
     menuBtn.classList.toggle('wp-menu-btn-visible', over)
     setWidgetCursor(over ? 'grab' : '')
+    // 悬停鲸鱼本体 → 计时触发害羞
+    if (mood === 'normal' && !pressing && exprEnabled.shy && isWhaleHit(e)) {
+      resetExpressionIdle()
+      if (!isHovering) {
+        isHovering = true
+        hoverTimer = setTimeout(function () {
+          hoverTimer = null
+          if (mood === 'normal' && isHovering && !pressing) enterShy()
+        }, hoverToShyMs)
+      }
+    } else if (isHovering) {
+      clearHoverTimer()
+    }
   }
 
   async function onDocPointerUp(e) {
@@ -802,8 +1174,7 @@
     setWidgetCursor('')
     if (clickAllowed && !drag.moved) {
       await api.dragEnd()
-      showBubble()
-      refresh(true)
+      handleWhaleClick()
       return
     }
     await finishDrag()
@@ -823,13 +1194,15 @@
   async function finishDrag() {
     var end = await api.dragEnd() // {x, y} 主进程记录的最终窗口位置
     var bd = await api.getDisplayBounds()
-    // 无吸附/无翻转：自由定位，仅钳制在显示器物理边界内（可贴到任意桌面边缘）
+    // 先钳制在显示器物理边界内，再做“靠近边缘才吸附”的贴边
     var x = Math.round(end.x), y = Math.round(end.y)
     // 用主进程返回的真实窗口尺寸，避免缩放异步期间 state.winW 与实际尺寸不一致导致钳制偏小
     var w = typeof end.width === 'number' ? end.width : state.winW
     var h = typeof end.height === 'number' ? end.height : state.winH
     x = clamp(x, bd.x, bd.x + bd.width - w)
     y = clamp(y, bd.y, bd.y + bd.height - h)
+    x = snapToEdge(x, bd.x, bd.x + bd.width - w)
+    y = snapToEdge(y, bd.y, bd.y + bd.height - h)
     state.winW = w
     state.winH = h
     await advancePos(x, y)
@@ -851,6 +1224,7 @@
   document.addEventListener('mouseleave', function () {
     menuBtn.classList.remove('wp-menu-btn-visible')
     setWidgetCursor('')
+    clearHoverTimer()
   })
 
   var widgetCursor = ''
@@ -916,12 +1290,15 @@
   function pressDown() {
     body.style.transform = SQUISH
     pressing = true
+    cancelBlink(false)
+    syncExpression()
     playPress()
   }
 
   function pressUp() {
     body.style.transform = 'scaleY(1) scaleX(1)'
     pressing = false
+    syncExpression()
     if (pressEnded) {
       playRelease()
       return
@@ -994,13 +1371,12 @@
     soundVol = typeof c.volume === 'number' ? c.volume : 0.8
     soundOn = soundVol > 0
     threshold = typeof c.lowBalanceThreshold === 'number' ? c.lowBalanceThreshold : 10
-    alertImage = c.alertImage === true
-    if (typeof c.alertImgPath === 'string' && c.alertImgPath.trim()) alertImgPath = c.alertImgPath.trim()
     if (typeof c.mainImgPath === 'string' && c.mainImgPath.trim()) mainImgPath = c.mainImgPath.trim()
     if (typeof c.bubbleTextOk === 'string' && c.bubbleTextOk.trim()) bubbleTextOk = c.bubbleTextOk.trim().slice(0, 20)
     if (typeof c.bubbleTextLow === 'string' && c.bubbleTextLow.trim()) bubbleTextLow = c.bubbleTextLow.trim().slice(0, 20)
     if (typeof c.textColorOk === 'string') textColorOk = /^#[0-9a-fA-F]{6}$/.test(c.textColorOk.trim()) ? c.textColorOk.trim() : ''
     if (typeof c.textColorLow === 'string') textColorLow = /^#[0-9a-fA-F]{6}$/.test(c.textColorLow.trim()) ? c.textColorLow.trim() : ''
+    if (typeof c.bubbleColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.bubbleColor.trim())) bubbleColor = c.bubbleColor.trim()
     if (typeof c.peakTextOff === 'string') peakTextOff = c.peakTextOff.trim().slice(0, 12)
     if (typeof c.peakTextOn === 'string') peakTextOn = c.peakTextOn.trim().slice(0, 12)
     if (typeof c.pressSound === 'string') pressSound = c.pressSound.trim()
@@ -1012,10 +1388,15 @@
       refreshTimer = setInterval(function () { refresh(false) }, refreshIntervalMs)
     }
     applySoundSet()
+    applyExpressionConfig(c.expressions)
+    applyBubbleStroke(bubbleColor)
     if (typeof c.scale === 'number' && c.scale !== state.scale) {
       await setScale(c.scale)
     }
-    updateHeroImage()
+    syncExhaustedMode()
+    syncExpression()
+    scheduleNextBlink()
+    resetExpressionIdle()
   }
 
   // ------------------------------------------------------------- 外部事件

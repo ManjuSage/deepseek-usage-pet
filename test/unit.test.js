@@ -66,6 +66,8 @@ test('priceFor: 模型匹配与默认回落', () => {
   assert.strictEqual(bal.priceFor('deepseek-v4-pro'), bal.PRO_PRICE)
   assert.strictEqual(bal.priceFor('deepseek-chat'), bal.BASE_PRICE)
   assert.strictEqual(bal.priceFor('deepseek-chat & deepseek-reasoner'), bal.BASE_PRICE)
+  assert.strictEqual(bal.priceFor('deepseek-v4.1-flash-expires-on-0910'), bal.BASE_PRICE)
+  assert.strictEqual(bal.priceFor('deepseek-v4.1-pro-expires-on-0910'), bal.PRO_PRICE)
   assert.strictEqual(bal.priceFor('unknown-model-xyz'), bal.BASE_PRICE)
   assert.strictEqual(bal.priceFor(''), bal.BASE_PRICE)
 })
@@ -254,20 +256,17 @@ test('config: 消毒 / 原子保存 / 环境变量覆盖', () => {
   assert.strictEqual(s.peakMode, 'default')
   assert.strictEqual(s.posH, null)
 
-  // 预警换图：默认关闭；预警图默认取 DSniang03.png（素材缺失 → getEffective 置空）
+  // 低余额换图已合并到「疲惫表情」：旧 alertImgPath 迁移到 expressions.images.exhausted
   const sa = config.sanitize({})
-  assert.strictEqual(sa.alertImage, false, '预警换图默认关闭')
-  assert.strictEqual(sa.alertImgPath, 'assets/DSniang03.png')
+  assert.strictEqual(sa.expressions.images.exhausted, 'assets/expressions/exhausted.png', '疲惫表情默认内置图')
   assert.strictEqual(sa.mainImgPath, 'assets/DSniang1.png', '主图默认内置素材')
   assert.strictEqual(sa.theme, 'system', '主题默认跟随系统')
-  // 机器上无 assets/DSniang03.png → 无默认预警图（alertImgPath 置空）
-  const effAlert = config.getEffective()
-  assert.strictEqual(effAlert.alertImgPath, '', '无 DSniang03.png 时无默认预警图')
-  const sa2 = config.sanitize({ alertImage: true, alertImgPath: 'assets/warn.png' })
-  assert.strictEqual(sa2.alertImage, true)
-  assert.strictEqual(sa2.alertImgPath, 'assets/warn.png')
-  const sa3 = config.sanitize({ alertImage: true, alertImgPath: '   ' })
-  assert.strictEqual(sa3.alertImgPath, 'assets/DSniang03.png', '空路径回退默认')
+  // 旧自定义预警图 → 迁移到疲惫表情
+  const sa2 = config.sanitize({ alertImgPath: 'assets/warn.png' })
+  assert.strictEqual(sa2.expressions.images.exhausted, 'assets/warn.png', '旧预警图迁移到疲惫表情')
+  // 旧默认预警图路径（DSniang03.png）不覆盖新默认疲惫图
+  const sa3 = config.sanitize({ alertImgPath: 'assets/DSniang03.png' })
+  assert.strictEqual(sa3.expressions.images.exhausted, 'assets/expressions/exhausted.png', '旧默认预警图不覆盖')
 
   // 主图/主题/气泡文案
   const s4 = config.sanitize({ mainImgPath: '/tmp/my-whale.png', theme: 'dark', bubbleTextOk: '  余额还够用  ', bubbleTextLow: '快没余额了！！！！！超过了二十个字符限制' })

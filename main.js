@@ -14,6 +14,7 @@ const balanceMod = require('./lib/balance')
 const linesMod = require('./lib/lines')
 const storeMod = require('./lib/store')
 const usageMod = require('./lib/usage-sync')
+const updateMod = require('./lib/update')
 const log = require('./lib/log')
 
 const IS_SMOKE = process.argv.includes('--smoke-test')
@@ -283,6 +284,7 @@ function rebuildTrayMenu() {
       { label: '立即刷新余额', click: () => sendRefresh() },
       { label: '用量统计', click: () => openUsage() },
       { label: '打开设置', click: () => openMenu() },
+      { label: '检查更新', click: () => checkUpdateFromTray() },
       { type: 'separator' },
       { label: '开机自启', type: 'checkbox', checked: !!cfg.autostart, click: (item) => setAutostart(item.checked) },
       { type: 'separator' },
@@ -300,6 +302,29 @@ function togglePet() {
 
 function sendRefresh() {
   if (petWin && !petWin.isDestroyed()) petWin.webContents.send('whale:refresh')
+}
+
+async function checkUpdateFromTray() {
+  const result = await updateMod.checkForUpdate(app.getVersion())
+  let title, body, url = ''
+  if (!result.ok) {
+    title = '检查更新失败'
+    body = result.error || '网络错误'
+  } else if (result.hasUpdate) {
+    title = '发现新版本'
+    body = '最新 v' + result.latest + '（当前 v' + result.current + '），点击打开下载页'
+    url = result.url
+  } else {
+    title = '已是最新版本'
+    body = '当前 v' + result.current
+  }
+  try {
+    if (Notification.isSupported()) {
+      const n = new Notification({ title, body, icon: path.join(__dirname, 'assets', 'DSniang1.png') })
+      if (url) n.on('click', () => shell.openExternal(url))
+      n.show()
+    }
+  } catch (err) { /* 忽略通知失败 */ }
 }
 
 // 判断 IPC 来源是否设置窗（menu.html）
@@ -896,16 +921,23 @@ function registerIpc() {
   })
 
   // ---------- 主图 / 预警图上传（复制到配置目录，与源文件解耦）----------
-  function imagePatchFor(kind) {
-    // 预警图默认取 assets/DSniang03.png（无此素材 → getEffective 置空 = 无默认预警图）
-    return kind === 'alert' ? { alertImgPath: 'assets/DSniang03.png' } : { mainImgPath: 'assets/DSniang1.png' }
+  const EXPR_IMAGE_KINDS = ['press', 'angry', 'disappointed', 'shy', 'exhausted', 'blinkHalf', 'blinkClosed', 'blinkHalfOpen']
+  const EXPR_IMAGE_LABELS = { press: '按压', angry: '生气', disappointed: '失望', shy: '害羞', exhausted: '疲惫', blinkHalf: '眨眼半闭', blinkClosed: '眨眼闭眼', blinkHalfOpen: '眨眼半睁' }
+
+  function expressionImagePatch(kind, value) {
+    const cfg = configMod.getEffective()
+    const ex = cfg.expressions && typeof cfg.expressions === 'object' ? cfg.expressions : {}
+    const imgs = ex.images && typeof ex.images === 'object' ? ex.images : {}
+    return { expressions: { ...ex, images: { ...imgs, [kind]: value } } }
   }
 
   ipcMain.handle('image:pick', async (e, msg) => {
-    const kind = msg && msg.kind === 'alert' ? 'alert' : 'main'
+    const raw = msg && msg.kind ? String(msg.kind) : 'main'
+    const isExpr = EXPR_IMAGE_KINDS.indexOf(raw) !== -1
+    const kind = isExpr ? raw : 'main'
     try {
       const res = await dialog.showOpenDialog(menuWin && !menuWin.isDestroyed() ? menuWin : undefined, {
-        title: kind === 'alert' ? '选择预警图片' : '选择主图',
+        title: isExpr ? ('选择' + EXPR_IMAGE_LABELS[kind] + '图片') : '选择主图',
         filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
         properties: ['openFile'],
       })
@@ -914,9 +946,9 @@ function registerIpc() {
       const imagesDir = path.join(configMod.CONFIG_DIR, 'images')
       fs.mkdirSync(imagesDir, { recursive: true, mode: 0o700 })
       const ext = (path.extname(src) || '.png').toLowerCase()
-      const dest = path.join(imagesDir, (kind === 'alert' ? 'alert' : 'main') + ext)
+      const dest = path.join(imagesDir, (isExpr ? ('expr_' + kind) : 'main') + ext)
       fs.copyFileSync(src, dest)
-      const patch = kind === 'alert' ? { alertImgPath: dest } : { mainImgPath: dest }
+      const patch = isExpr ? expressionImagePatch(kind, dest) : { mainImgPath: dest }
       configMod.save(patch)
       broadcast('config:changed', configMod.getEffective())
       return { ok: true, path: dest }
@@ -926,8 +958,15 @@ function registerIpc() {
   })
 
   ipcMain.handle('image:reset', (e, msg) => {
-    const kind = msg && msg.kind === 'alert' ? 'alert' : 'main'
-    configMod.save(imagePatchFor(kind))
+    const raw = msg && msg.kind ? String(msg.kind) : 'main'
+    const isExpr = EXPR_IMAGE_KINDS.indexOf(raw) !== -1
+    const kind = isExpr ? raw : 'main'
+    if (isExpr) {
+      const def = configMod.DEFAULTS.expressions.images[kind] || ''
+      configMod.save(expressionImagePatch(kind, def))
+    } else {
+      configMod.save({ mainImgPath: 'assets/DSniang1.png' })
+    }
     broadcast('config:changed', configMod.getEffective())
     return { ok: true }
   })
@@ -977,10 +1016,21 @@ function registerIpc() {
     return { ...data, file: LINES_FILE }
   })
 
-  ipcMain.handle('custom:reload', () => {
-    const data = linesMod.readPool()
-    broadcast('custom:changed', data)
-    return { ...data, file: LINES_FILE }
+  ipcMain.handle('custom:save', (e, data) => {
+    const saved = linesMod.writePool(data)
+    broadcast('custom:changed', saved)
+    return saved
+  })
+
+  ipcMain.handle('update:check', async () => {
+    return updateMod.checkForUpdate(app.getVersion())
+  })
+
+  ipcMain.handle('shell:open-external', (e, msg) => {
+    const url = String(msg && msg.url || '')
+    if (!/^https?:\/\//.test(url)) return { ok: false, error: 'forbidden url' }
+    shell.openExternal(url)
+    return { ok: true }
   })
 
   // ---------- 透明像素点击穿透 ----------

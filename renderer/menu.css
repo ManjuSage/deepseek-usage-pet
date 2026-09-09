@@ -140,6 +140,94 @@ html, body {
 .wm-row input::placeholder { color: var(--wm-hint); opacity: .8; }
 .wm-row input[type="number"] { flex: 0 0 56px; width: 56px; }
 
+.wm-fold {
+  margin: 8px 0;
+  border: 1px solid var(--wm-border);
+  border-radius: 8px;
+  background: var(--wm-card-bg);
+}
+.wm-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wm-fg);
+  user-select: none;
+}
+.wm-fold > summary::-webkit-details-marker { display: none; }
+.wm-fold > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 7px;
+  transition: transform .15s ease;
+  color: var(--wm-hint);
+}
+.wm-fold[open] > summary::before { transform: rotate(90deg); }
+.wm-fold-body { padding: 2px 11px 11px; }
+
+.wm-disabled { opacity: .45; pointer-events: none; }
+
+.wm-lines { margin-bottom: 10px; }
+.wm-lines-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--wm-fg);
+}
+.wm-chip-count { font-size: 11px; color: var(--wm-hint); }
+.wm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--wm-border);
+  border-radius: 8px;
+  background: var(--wm-input-bg);
+  min-height: 34px;
+}
+.wm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 3px 3px 9px;
+  border: 1px solid var(--wm-border);
+  border-radius: 999px;
+  background: var(--wm-input-accent);
+  color: var(--wm-fg);
+  font-size: 12px;
+  line-height: 1.2;
+}
+.wm-chip-text { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-chip-x {
+  border: none;
+  background: transparent;
+  color: var(--wm-hint);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 1px 4px;
+  border-radius: 50%;
+}
+.wm-chip-x:hover { color: #e0433f; background: rgba(224, 67, 63, .14); }
+.wm-chip-add { display: flex; gap: 6px; margin-top: 6px; }
+.wm-chip-add input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--wm-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  color: var(--wm-input-fg);
+  background: var(--wm-input-bg);
+  box-sizing: border-box;
+}
+.wm-chip-add input::placeholder { color: var(--wm-hint); opacity: .8; }
+
 .wm-grid .wm-label { flex: 0 0 auto; min-width: 60px; white-space: normal; }
 .wm-label { flex: 0 0 auto; min-width: 78px; white-space: normal; }
 
@@ -183,7 +271,7 @@ html, body {
   cursor: pointer;
 }
 
-.wm-actions { margin-top: 10px; }
+.wm-actions { margin-top: 10px; display: flex; gap: 6px; }
 .wm-btn {
   flex: 1;
   border: 1px solid var(--wm-border);

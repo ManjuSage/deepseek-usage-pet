@@ -85,6 +85,30 @@ test/               单元测试（node --test）
 - 打包联网下载 NSIS 工具链 / Electron 用 npmmirror 镜像（直接 GitHub 可能失败）。
 - electron-builder 26 需要下载 `icons` / `nsis` / `7zip` / `nsis-resources` 等二进制，npmmirror 镜像可能缺（404），需从 GitHub 手动下载放进 `%LOCALAPPDATA%\electron-builder\Cache`。
 
+## 版本发布规范（SemVer）
+
+遵循 [Semantic Versioning 2.0.0](https://semver.org/lang/zh-CN/)。版本号格式 `MAJOR.MINOR.PATCH`，Git 标签用 `v` 前缀（如 `v1.1.0`）。
+
+- **MAJOR（第一位）**：不兼容 / 破坏性变更。例如删除功能、改配置文件结构（不兼容迁移）、放弃某平台支持、改动对外接口。
+- **MINOR（第二位）**：向后兼容的**新功能**。例如新增表情、新增图表、新增托盘入口、新增设置项。
+- **PATCH（第三位）**：向后兼容的 **bug 修复**（以及文档纠错、不影响行为的依赖小升级等）。
+
+发布时由 AI 根据改动性质自行确定版本号，无需用户指定：
+
+- 只有修复/微调 → PATCH：`x.y.z` → `x.y.(z+1)`
+- 有新增功能 → MINOR：`x.y.z` → `x.(y+1).0`
+- 有破坏性变更 → MAJOR：`x.y.z` → `(x+1).0.0`
+- 预发布/测试版用后缀：`x.y.z-beta.N`、`x.y.z-rc.N`，稳定后再发正式 `x.y.z`
+
+每次发版同步更新：
+
+- `CHANGELOG.md`（版本历史，必须）
+- `README.md` / `DESIGN.md`（仅当功能/设计描述发生变化时）
+- `package.json` 与 `package-lock.json` 的 `version`
+- GitHub Release 标签与说明
+
+> 历史说明：`1.0.6` 及之前（`0.1.0 → 1.0.0 → 1.0.6`）未严格遵循 SemVer（新增功能也用了 PATCH 位）。为遵循规范，下一版直接跳到 `1.1.0`（MINOR），不回改已发布的历史标签。
+
 ## 常用命令
 
 ```bash

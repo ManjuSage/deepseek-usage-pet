@@ -20,6 +20,7 @@
     bubble: $('wm-bubble'), bubbleInterval: $('wm-bubble-interval'), idleFade: $('wm-idlefade'), mirror: $('wm-mirror'),
     idleOpacity: $('wm-idle-opacity'), idleOpacityV: $('wm-idle-opacity-v'),
     scale: $('wm-scale'), scaleV: $('wm-scale-v'),
+    bubbleColor: $('wm-bubble-color'), bubbleColorReset: $('wm-bubble-color-reset'),
     peak: $('wm-peak'), peakText: $('wm-peaktext'), peakOff: $('wm-peak-off'), peakOn: $('wm-peak-on'),
     textOk: $('wm-text-ok'), textLow: $('wm-text-low'),
     colorOk: $('wm-color-ok'), colorLow: $('wm-color-low'),
@@ -28,17 +29,25 @@
     pressPick: $('wm-press-pick'), pressReset: $('wm-press-reset'),
     releasePick: $('wm-release-pick'), releaseReset: $('wm-release-reset'),
     soundNote: $('wm-sound-note'),
-    alertImage: $('wm-alertimage'),
-    alertAvail: $('wm-alert-avail'),
     mainPick: $('wm-main-pick'), mainReset: $('wm-main-reset'), mainNote: $('wm-main-note'),
-    alertPick: $('wm-alert-pick'), alertReset: $('wm-alert-reset'), alertNote: $('wm-alert-note'),
-    customReload: $('wm-custom-reload'), customOpen: $('wm-custom-open'), customNote: $('wm-custom-note'),
     configOpen: $('wm-config-open'),
+    updateCheck: $('wm-update-check'), updateNote: $('wm-update-note'),
     usageOpen: $('wm-usage-open'),
     logOpen: $('wm-log-open'),
     soundsOpen: $('wm-sounds-open'),
     imagesOpen: $('wm-images-open'),
     refreshNow: $('wm-refresh-now'),
+    exprMaster: $('wm-expr-master'),
+    exprBlink: $('wm-expr-blink'), exprAngry: $('wm-expr-angry'), exprDisappointed: $('wm-expr-disappointed'), exprShy: $('wm-expr-shy'), exprExhausted: $('wm-expr-exhausted'),
+    exprPressPick: $('wm-expr-press-pick'), exprPressReset: $('wm-expr-press-reset'),
+    exprAngryPick: $('wm-expr-angry-pick'), exprAngryReset: $('wm-expr-angry-reset'),
+    exprDisappointedPick: $('wm-expr-disappointed-pick'), exprDisappointedReset: $('wm-expr-disappointed-reset'),
+    exprShyPick: $('wm-expr-shy-pick'), exprShyReset: $('wm-expr-shy-reset'),
+    exprExhaustedPick: $('wm-expr-exhausted-pick'), exprExhaustedReset: $('wm-expr-exhausted-reset'),
+    exprBlinkHalfPick: $('wm-expr-blinkhalf-pick'), exprBlinkHalfReset: $('wm-expr-blinkhalf-reset'),
+    exprBlinkClosedPick: $('wm-expr-blinkclosed-pick'), exprBlinkClosedReset: $('wm-expr-blinkclosed-reset'),
+    exprBlinkHalfOpenPick: $('wm-expr-blinkhalfopen-pick'), exprBlinkHalfOpenReset: $('wm-expr-blinkhalfopen-reset'),
+    exprBlinkMin: $('wm-expr-blinkmin'), exprBlinkMax: $('wm-expr-blinkmax'), exprIdleDis: $('wm-expr-idledis'), exprHoverShy: $('wm-expr-hovershy'), exprShyDur: $('wm-expr-shydur'), exprAngryDur: $('wm-expr-angrydur'), exprExhPrompt: $('wm-expr-exhprompt'),
   }
 
   // ---------- Tab 切换 ----------
@@ -81,7 +90,7 @@
   else if (systemDark.addListener) systemDark.addListener(onSystemThemeChange)
 
   function imgPathNote(path) {
-    if (!path) return '未提供（无默认预警图，可上传）'
+    if (!path) return '未提供（可上传）'
     if (path.indexOf('assets/') === 0) return path + '（内置素材）'
     return path.split('/').pop() + '（已复制到配置目录）'
   }
@@ -105,6 +114,7 @@
     els.idleOpacityV.textContent = Math.round((cfg.idleOpacity != null ? cfg.idleOpacity : 0.6) * 100) + '%'
     els.scale.value = String(cfg.scale || 1)
     els.scaleV.textContent = (cfg.scale || 1).toFixed(1)
+    els.bubbleColor.value = /^#[0-9a-fA-F]{6}$/.test(cfg.bubbleColor || '') ? cfg.bubbleColor : '#203170'
     els.peak.value = cfg.peakMode || 'default'
     els.peakText.checked = cfg.peakText !== false
     els.peakOff.value = cfg.peakTextOff || ''
@@ -116,17 +126,7 @@
     els.sound.value = cfg.soundSet || 'duck'
     els.vol.value = String(cfg.volume != null ? cfg.volume : 0.8)
     els.volV.textContent = Math.round((cfg.volume != null ? cfg.volume : 0.8) * 100) + '%'
-    els.alertImage.checked = cfg.alertImage === true
     els.mainNote.textContent = '主图：' + imgPathNote(cfg.mainImgPath || 'assets/DSniang1.png')
-    els.alertNote.textContent = '预警图：' + imgPathNote(cfg.alertImgPath || '') + '（与主图独立）'
-    if (cfg.alertImgPath) {
-      els.alertAvail.textContent = '预警换图：余额低于阈值时自动切换为预警图'
-      els.alertAvail.className = 'wm-note wm-note-ok'
-      els.alertImage.disabled = false
-    } else {
-      els.alertAvail.textContent = '未提供默认预警图（无 assets/DSniang03.png）：开启预警换图需先在下方上传预警图。'
-      els.alertAvail.className = 'wm-note wm-note-warn'
-    }
     if (cfg.apiKeySource === 'env') {
       els.apiKeyNote.textContent = '当前使用环境变量 DEEPSEEK_API_KEY（此处可覆盖文件配置）'
       els.apiKeyNote.className = 'wm-note wm-note-ok'
@@ -140,6 +140,27 @@
       els.apiKeyNote.className = 'wm-note wm-note-warn'
       els.apiKey.disabled = false
     }
+    fillExpressions(cfg)
+  }
+
+  function fillExpressions(cfg) {
+    var ex = (cfg && cfg.expressions) || {}
+    var en = ex.enabled || {}
+    els.exprMaster.checked = ex.masterEnabled !== false
+    updateExprMasterUI(els.exprMaster.checked)
+    els.exprBlink.checked = en.blink !== false
+    els.exprAngry.checked = en.angry !== false
+    els.exprDisappointed.checked = en.disappointed !== false
+    els.exprShy.checked = en.shy !== false
+    els.exprExhausted.checked = en.exhausted !== false
+    renderAllExprLines()
+    els.exprBlinkMin.value = ex.blinkMinSec != null ? ex.blinkMinSec : 4
+    els.exprBlinkMax.value = ex.blinkMaxSec != null ? ex.blinkMaxSec : 6
+    els.exprIdleDis.value = ex.idleToDisappointedSec != null ? ex.idleToDisappointedSec : 180
+    els.exprHoverShy.value = (ex.hoverToShyMs != null ? ex.hoverToShyMs : 1500) / 1000
+    els.exprShyDur.value = (ex.shyDurationMs != null ? ex.shyDurationMs : 10000) / 1000
+    els.exprAngryDur.value = (ex.angryDurationMs != null ? ex.angryDurationMs : 5000) / 1000
+    els.exprExhPrompt.value = ex.exhaustedPromptSec != null ? ex.exhaustedPromptSec : 300
   }
 
   async function reload() {
@@ -150,7 +171,7 @@
   function anyFocused() {
     try {
       var a = document.activeElement
-      return !!(a && a.tagName && (a.tagName === 'INPUT' || a.tagName === 'SELECT'))
+      return !!(a && a.tagName && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA'))
     } catch (err) { return false }
   }
 
@@ -217,8 +238,6 @@
   els.mirror.addEventListener('change', function () { api.setConfig({ mirror: els.mirror.checked }) })
   els.autostart.addEventListener('change', function () { api.setConfig({ autostart: els.autostart.checked }) })
   els.autosync.addEventListener('change', function () { api.setConfig({ autoSync: els.autosync.checked }) })
-  els.alertImage.addEventListener('change', function () { api.setConfig({ alertImage: els.alertImage.checked }) })
-
   // ---------- 滑块（实时预览 + 防抖保存） ----------
   els.scale.addEventListener('input', function () {
     els.scaleV.textContent = Number(els.scale.value).toFixed(1)
@@ -231,6 +250,12 @@
   els.idleOpacity.addEventListener('input', function () {
     els.idleOpacityV.textContent = Math.round(Number(els.idleOpacity.value) * 100) + '%'
     debounceSave({ idleOpacity: Number(els.idleOpacity.value) }, 200)
+  })
+  els.bubbleColor.addEventListener('input', function () {
+    debounceSave({ bubbleColor: els.bubbleColor.value }, 200)
+  })
+  els.bubbleColorReset.addEventListener('click', function () {
+    api.setConfig({ bubbleColor: '#203170' }).then(function () { reload() })
   })
 
   // ---------- 数字输入 ----------
@@ -271,10 +296,10 @@
     api.setConfig({ bubbleTextLow: els.textLow.value.trim() })
   })
   els.colorOk.addEventListener('input', function () {
-    api.setConfig({ textColorOk: els.colorOk.value })
+    debounceSave({ textColorOk: els.colorOk.value }, 200)
   })
   els.colorLow.addEventListener('input', function () {
-    api.setConfig({ textColorLow: els.colorLow.value })
+    debounceSave({ textColorLow: els.colorLow.value }, 200)
   })
   els.colorOkReset.addEventListener('click', function () {
     api.setConfig({ textColorOk: '' }).then(function () { reload() })
@@ -283,7 +308,7 @@
     api.setConfig({ textColorLow: '' }).then(function () { reload() })
   })
 
-  // ---------- 主图 / 预警图 上传 ----------
+  // ---------- 主图 上传 ----------
   function bindImagePicker(pickBtn, resetBtn, kind, noteEl) {
     pickBtn.addEventListener('click', async function () {
       pickBtn.disabled = true
@@ -309,7 +334,163 @@
     })
   }
   bindImagePicker(els.mainPick, els.mainReset, 'main', els.mainNote)
-  bindImagePicker(els.alertPick, els.alertReset, 'alert', els.alertNote)
+
+  // ---------- 表情：开关 / 图片 / 台词 ----------
+  function patchExpressions(mutator) {
+    var ex = (currentCfg && currentCfg.expressions) ? JSON.parse(JSON.stringify(currentCfg.expressions)) : { enabled: {}, lines: {} }
+    mutator(ex)
+    api.setConfig({ expressions: ex }).catch(function () {})
+  }
+
+  function bindExprToggle(el, key) {
+    el.addEventListener('change', function () {
+      patchExpressions(function (ex) {
+        ex.enabled = ex.enabled || {}
+        ex.enabled[key] = el.checked
+      })
+    })
+  }
+  function updateExprMasterUI(on) {
+    var folds = document.querySelectorAll('#page-expression details')
+    for (var i = 0; i < folds.length; i++) {
+      folds[i].classList.toggle('wm-disabled', !on)
+    }
+  }
+  els.exprMaster.addEventListener('change', function () {
+    var on = els.exprMaster.checked
+    patchExpressions(function (ex) { ex.masterEnabled = on })
+    updateExprMasterUI(on)
+  })
+  bindExprToggle(els.exprBlink, 'blink')
+  bindExprToggle(els.exprAngry, 'angry')
+  bindExprToggle(els.exprDisappointed, 'disappointed')
+  bindExprToggle(els.exprShy, 'shy')
+  bindExprToggle(els.exprExhausted, 'exhausted')
+
+  function bindExprImagePicker(pickBtn, resetBtn, kind) {
+    pickBtn.addEventListener('click', async function () {
+      pickBtn.disabled = true
+      try { await api.pickImage(kind); await reload() } finally { pickBtn.disabled = false }
+    })
+    resetBtn.addEventListener('click', async function () {
+      resetBtn.disabled = true
+      try { await api.resetImage(kind); await reload() } finally { resetBtn.disabled = false }
+    })
+  }
+  bindExprImagePicker(els.exprPressPick, els.exprPressReset, 'press')
+  bindExprImagePicker(els.exprAngryPick, els.exprAngryReset, 'angry')
+  bindExprImagePicker(els.exprDisappointedPick, els.exprDisappointedReset, 'disappointed')
+  bindExprImagePicker(els.exprShyPick, els.exprShyReset, 'shy')
+  bindExprImagePicker(els.exprExhaustedPick, els.exprExhaustedReset, 'exhausted')
+  bindExprImagePicker(els.exprBlinkHalfPick, els.exprBlinkHalfReset, 'blinkHalf')
+  bindExprImagePicker(els.exprBlinkClosedPick, els.exprBlinkClosedReset, 'blinkClosed')
+  bindExprImagePicker(els.exprBlinkHalfOpenPick, els.exprBlinkHalfOpenReset, 'blinkHalfOpen')
+
+  function getExprLines(key) {
+    var lines = (currentCfg && currentCfg.expressions && currentCfg.expressions.lines) || {}
+    return Array.isArray(lines[key]) ? lines[key].slice() : []
+  }
+  function saveExprLines(key, arr) {
+    if (currentCfg && currentCfg.expressions) {
+      currentCfg.expressions.lines = currentCfg.expressions.lines || {}
+      currentCfg.expressions.lines[key] = arr
+    }
+    patchExpressions(function (ex) {
+      ex.lines = ex.lines || {}
+      ex.lines[key] = arr
+    })
+  }
+  function renderExprLines(key) {
+    var container = document.querySelector('.wm-lines[data-key="' + key + '"]')
+    if (!container) return
+    var chipsEl = container.querySelector('.wm-chips')
+    var countEl = container.querySelector('.wm-chip-count')
+    var arr = getExprLines(key)
+    chipsEl.innerHTML = ''
+    arr.forEach(function (text, idx) {
+      var chip = document.createElement('span')
+      chip.className = 'wm-chip'
+      var t = document.createElement('span')
+      t.className = 'wm-chip-text'
+      t.textContent = text
+      t.title = text
+      var x = document.createElement('button')
+      x.type = 'button'
+      x.className = 'wm-chip-x'
+      x.textContent = '×'
+      x.title = '删除'
+      x.addEventListener('click', function () { removeExprLine(key, idx) })
+      chip.appendChild(t)
+      chip.appendChild(x)
+      chipsEl.appendChild(chip)
+    })
+    countEl.textContent = arr.length + ' 条'
+  }
+  function addExprLine(key, text) {
+    var t = String(text || '').trim()
+    if (!t) return
+    var arr = getExprLines(key)
+    if (arr.indexOf(t) !== -1) return
+    arr.push(t)
+    saveExprLines(key, arr)
+    renderExprLines(key)
+  }
+  function removeExprLine(key, idx) {
+    var arr = getExprLines(key)
+    if (idx < 0 || idx >= arr.length) return
+    arr.splice(idx, 1)
+    saveExprLines(key, arr)
+    renderExprLines(key)
+  }
+  function resetExprLines(key) {
+    saveExprLines(key, []) // 空数组 → 配置消毒回退到默认台词
+  }
+  function renderAllExprLines() {
+    renderExprLines('angryWarn')
+    renderExprLines('disappointedEntry')
+    renderExprLines('lonely')
+    renderExprLines('shy')
+    renderExprLines('exhausted')
+  }
+  function initExprLineEditor(key) {
+    var container = document.querySelector('.wm-lines[data-key="' + key + '"]')
+    if (!container) return
+    var input = container.querySelector('.wm-chip-add input')
+    var btn = container.querySelector('.wm-chip-add button')
+    var resetBtn = container.querySelector('.wm-chip-reset')
+    function add() {
+      addExprLine(key, input.value)
+      input.value = ''
+      input.focus()
+    }
+    btn.addEventListener('click', add)
+    resetBtn.addEventListener('click', function () { resetExprLines(key) })
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); add() }
+    })
+  }
+  initExprLineEditor('angryWarn')
+  initExprLineEditor('disappointedEntry')
+  initExprLineEditor('lonely')
+  initExprLineEditor('shy')
+  initExprLineEditor('exhausted')
+
+  function bindExprNumber(el, key, factor) {
+    el.addEventListener('change', function () {
+      var v = parseFloat(el.value)
+      if (!isFinite(v)) return
+      patchExpressions(function (ex) {
+        ex[key] = Math.round(v * (factor || 1))
+      })
+    })
+  }
+  bindExprNumber(els.exprBlinkMin, 'blinkMinSec', 1)
+  bindExprNumber(els.exprBlinkMax, 'blinkMaxSec', 1)
+  bindExprNumber(els.exprIdleDis, 'idleToDisappointedSec', 1)
+  bindExprNumber(els.exprHoverShy, 'hoverToShyMs', 1000)
+  bindExprNumber(els.exprShyDur, 'shyDurationMs', 1000)
+  bindExprNumber(els.exprAngryDur, 'angryDurationMs', 1000)
+  bindExprNumber(els.exprExhPrompt, 'exhaustedPromptSec', 1)
 
   // ---------- 自定义音效（按压/松手） ----------
   function bindSoundPicker(pickBtn, resetBtn, which) {
@@ -339,20 +520,103 @@
   bindSoundPicker(els.pressPick, els.pressReset, 'press')
   bindSoundPicker(els.releasePick, els.releaseReset, 'release')
 
-  // ---------- 随机台词池（lines.json） ----------
-  els.customReload.addEventListener('click', async function () {
-    els.customReload.disabled = true
-    try {
-      var d = await api.reloadCustom()
-      var groups = d && d.groups ? d.groups.length : 0
-      var n = 0
-      for (var g of (d && d.groups ? d.groups : [])) if (g.lines) n += g.lines.length
-      els.customNote.textContent = (groups > 0 ? '已载入 ' + groups + ' 组（' + n + ' 条台词' + (d.gif ? ' + 自定义动图' : '') + '）' : '无有效配置')
-      els.customNote.className = 'wm-note ' + (groups > 0 ? 'wm-note-ok' : '')
-    } finally {
-      els.customReload.disabled = false
+  // ---------- 随机台词池（lines.json → 词条标签编辑器） ----------
+  var customPool = { gif: '', specialGroups: [], textGroups: [] }
+
+  function loadCustomPoolFromData(d) {
+    customPool.gif = (d && typeof d.gif === 'string') ? d.gif : ''
+    customPool.specialGroups = []
+    customPool.textGroups = []
+    var groups = (d && Array.isArray(d.groups)) ? d.groups : []
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i]
+      if (g && (g.type === 'balance' || g.type === 'gif')) customPool.specialGroups.push(g)
+      else if (g && typeof g.text === 'string' && g.text) customPool.textGroups.push(g)
     }
-  })
+    renderCustomChips()
+  }
+
+  async function loadCustomChips() {
+    try { loadCustomPoolFromData(await api.getCustom()) } catch (err) {}
+  }
+
+  function renderCustomChips() {
+    var container = document.getElementById('wm-custom-lines')
+    if (!container) return
+    var chipsEl = container.querySelector('.wm-chips')
+    var countEl = container.querySelector('.wm-chip-count')
+    chipsEl.innerHTML = ''
+    customPool.textGroups.forEach(function (g, idx) {
+      var chip = document.createElement('span')
+      chip.className = 'wm-chip'
+      var t = document.createElement('span')
+      t.className = 'wm-chip-text'
+      t.textContent = g.text
+      t.title = g.text
+      var x = document.createElement('button')
+      x.type = 'button'
+      x.className = 'wm-chip-x'
+      x.textContent = '×'
+      x.title = '删除'
+      x.addEventListener('click', function () { removeCustomLine(idx) })
+      chip.appendChild(t)
+      chip.appendChild(x)
+      chipsEl.appendChild(chip)
+    })
+    countEl.textContent = customPool.textGroups.length + ' 条'
+  }
+
+  function saveCustomPool() {
+    var groups = customPool.specialGroups.concat(customPool.textGroups)
+    api.saveCustom({ gif: customPool.gif, groups: groups }).catch(function () {})
+  }
+
+  function addCustomLine(text) {
+    var t = String(text || '').trim().slice(0, 40)
+    if (!t) return
+    for (var i = 0; i < customPool.textGroups.length; i++) {
+      if (customPool.textGroups[i].text === t) return
+    }
+    customPool.textGroups.push({ weight: 1, text: t, style: 'A', wrap: true, color: '' })
+    saveCustomPool()
+    renderCustomChips()
+  }
+
+  function removeCustomLine(idx) {
+    if (idx < 0 || idx >= customPool.textGroups.length) return
+    customPool.textGroups.splice(idx, 1)
+    saveCustomPool()
+    renderCustomChips()
+  }
+
+  function resetCustomLines() {
+    api.saveCustom({ gif: '', groups: [] }).then(function () {
+      return api.getCustom()
+    }).then(function (d) {
+      loadCustomPoolFromData(d)
+    }).catch(function () {})
+  }
+
+  function initCustomLineEditor() {
+    var container = document.getElementById('wm-custom-lines')
+    if (!container) return
+    var input = container.querySelector('.wm-chip-add input')
+    var btn = container.querySelector('.wm-chip-add button')
+    var resetBtn = container.querySelector('.wm-chip-reset')
+    function add() {
+      addCustomLine(input.value)
+      input.value = ''
+      input.focus()
+    }
+    btn.addEventListener('click', add)
+    resetBtn.addEventListener('click', resetCustomLines)
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); add() }
+    })
+  }
+
+  initCustomLineEditor()
+  loadCustomChips()
 
   // ---------- 打开文件/目录（用系统默认程序；引用配置内路径） ----------
   function bindOpen(btn, getPath) {
@@ -362,7 +626,6 @@
       try { await api.openPath(getPath()) } finally { btn.disabled = false }
     })
   }
-  bindOpen(els.customOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.lines) || '' })
   bindOpen(els.configOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.config) || '' })
   bindOpen(els.usageOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.usage) || '' })
   bindOpen(els.soundsOpen, function () { return (currentCfg && currentCfg.paths && currentCfg.paths.sounds) || '' })
@@ -387,6 +650,38 @@
       els.refreshNow.textContent = '失败'
     }
     setTimeout(function () { els.refreshNow.textContent = '立即刷新余额'; els.refreshNow.disabled = false }, 1200)
+  })
+
+  // ---------- 检查更新 ----------
+  var updateUrl = ''
+  els.updateNote.addEventListener('click', function () {
+    if (updateUrl) api.openExternal(updateUrl)
+  })
+  els.updateCheck.addEventListener('click', async function () {
+    els.updateCheck.disabled = true
+    els.updateNote.textContent = '正在检查更新…'
+    els.updateNote.className = 'wm-note'
+    updateUrl = ''
+    try {
+      var r = await api.checkUpdate()
+      if (!r || !r.ok) {
+        els.updateNote.textContent = '检查更新失败：' + ((r && r.error) || '网络错误')
+        els.updateNote.className = 'wm-note wm-note-warn'
+      } else if (r.hasUpdate) {
+        els.updateNote.textContent = '发现新版本 v' + r.latest + '（当前 v' + r.current + '），点击打开下载页'
+        els.updateNote.className = 'wm-note wm-note-ok'
+        updateUrl = r.url || ''
+      } else {
+        els.updateNote.textContent = '已是最新版本（v' + r.current + '）'
+        els.updateNote.className = 'wm-note wm-note-ok'
+      }
+    } catch (err) {
+      els.updateNote.textContent = '检查更新失败：' + String((err && err.message) || err)
+      els.updateNote.className = 'wm-note wm-note-warn'
+    } finally {
+      els.updateCheck.disabled = false
+    }
+    els.updateNote.style.cursor = updateUrl ? 'pointer' : ''
   })
 
   reload().catch(function (err) { console.error('[menu] load failed', err) })
