@@ -36,6 +36,22 @@
 
 ![用量趋势与热力图](docs/images/usage-trends.png)
 
+设置窗口按功能分为账户、数据、外观、文案、音效、图片和表情等页面。下面的截图按设置窗口标签顺序排列：账户与平台令牌、用量与同步、外观、文案、音效、图片和表情。表情页可独立启用各类状态并调整触发时长；文案页支持自定义余额提示、预警提示、随机台词及台词间隔，方便按自己的使用习惯调整桌宠反馈。
+
+![账户设置](docs/images/settings-account.png)
+
+![数据设置](docs/images/settings-data.png)
+
+![外观设置](docs/images/settings-appearance.png)
+
+![文案设置](docs/images/settings-copy.png)
+
+![音效设置](docs/images/settings-audio.png)
+
+![图片设置](docs/images/settings-images.png)
+
+![表情设置](docs/images/settings-emotions.png)
+
 
 ## 特性
 
