@@ -30,6 +30,8 @@
 
 ![分时明细](docs/images/usage-hourly-detail.png)
 
+模型名称会以易读别名显示：`deepseek-v4-flash` 与 `deepseek-flash` 合并为 **V4 Flash**；**V4 Flash Vision**、**V4.1 Flash** 和 **V4 Pro** 仍分别统计。合并只作用于图表与报表，数据库继续保留平台返回的原始模型 ID。
+
 **各模型占比**环形图、**累计趋势**与**用量热力图**一屏尽览，均跟随当前日期范围并可在 Tokens / 费用间切换；热力图按「周 × 天」网格展示历史用量，悬停即可查看某天的具体数字。
 
 ![用量趋势与热力图](docs/images/usage-trends.png)

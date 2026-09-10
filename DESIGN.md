@@ -90,6 +90,7 @@ meta(key, value)                                                          -- 账
 18. **「总体」时间范围**：预设按钮 `data-days="all"` 表示全部已记录数据，范围取 `getDateRange()`（`UNION ALL` 同时扫 `amount_daily` 与 `cost_daily`）。
 19. **热力图年份翻页**：`state.heatmapYear` 记录当前年，`heatmapRangeFor(year)` 补齐到完整周（周一~周日），使每年都是整周数、热力图呈规整长方形；`<`/`>` 按钮放在标题栏，避免挤占图表宽度。
 20. **输入缓存命中率口径**：`缓存命中输入 Tokens ÷（缓存命中输入 Tokens + 缓存未命中输入 Tokens）`；输出 Tokens 不进入分母，无输入时返回空值并在界面显示 `—`。
+21. **模型别名兼容**：报表查询层将 `deepseek-v4-flash` 与 `deepseek-flash` 归一为 `V4 Flash`；`V4 Flash Vision`、`V4.1 Flash` 与 `V4 Pro` 保持独立。归一化不改写 SQLite 中的平台原始模型 ID，V4.1 Flash 只接受已知精确 ID 与到期日期变体，避免未来视觉模型被误归类。
 
 ## 7. 风险与缓解
 
