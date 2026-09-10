@@ -52,12 +52,13 @@
     var map = {
       'deepseek-chat & deepseek-reasoner': 'Chat / Reasoner',
       'deepseek-v4-flash': 'V4 Flash',
+      'deepseek-flash': 'V4 Flash',
       'deepseek-v4-flash-vision-exp': 'V4 Flash Vision',
       'deepseek-v4-pro': 'V4 Pro',
       'deepseek-chat': 'Chat',
       'deepseek-reasoner': 'Reasoner',
     }
-    if (/^deepseek-v4\.1-flash(?:-|$)/.test(m)) return 'V4.1 Flash'
+    if (m === 'deepseek-v4.1-flash' || /^deepseek-v4\.1-flash-expires-on-\d{4}$/.test(m)) return 'V4.1 Flash'
     return map[m] || m
   }
 
