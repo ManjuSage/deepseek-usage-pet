@@ -51,9 +51,11 @@
     if (!m) return '(未命名)'
     var map = {
       'deepseek-chat & deepseek-reasoner': 'Chat / Reasoner',
-      'deepseek-v4-flash': 'V4 Flash',
-      'deepseek-flash': 'V4 Flash',
-      'deepseek-v4-flash-vision-exp': 'V4 Flash Vision',
+      'deepseek-v4-flash': 'V4.1 Flash',
+      'deepseek-flash': 'V4.1 Flash',
+      'deepseek-v4-flash-vision-exp': 'V4.1 Flash',
+      'deepseek-v4-flash-legacy': 'V4 Flash',
+      'deepseek-v4-flash-vision-exp-legacy': 'V4 Flash Vision',
       'deepseek-v4-pro': 'V4 Pro',
       'deepseek-chat': 'Chat',
       'deepseek-reasoner': 'Reasoner',

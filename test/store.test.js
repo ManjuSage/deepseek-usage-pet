@@ -143,9 +143,12 @@ test('store: 无输入 token 时缓存命中率为空', async () => {
   store.close()
 })
 
-test('store: 合并 V4 Flash 新旧 ID，但保持 V4.1 Flash 和 Vision 独立', async () => {
+test('store: 分时仅在观测到持久化切换点后合并 Flash 兼容别名', async () => {
   await store.init(DB4)
   store.upsertAmounts([
+    { utc_date: '2026-09-09', model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'output_tokens', amount: 10 },
+    { utc_date: '2026-09-09', model: 'deepseek-v4-flash-vision-exp', api_key_name: 'codex', type: 'output_tokens', amount: 20 },
+    { utc_date: '2026-09-09', model: 'deepseek-v4-pro', api_key_name: 'codex', type: 'output_tokens', amount: 30 },
     { utc_date: '2026-09-10', model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'input_cache_hit_tokens', amount: 100 },
     { utc_date: '2026-09-10', model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'input_cache_miss_tokens', amount: 100 },
     { utc_date: '2026-09-10', model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'output_tokens', amount: 10 },
@@ -157,6 +160,9 @@ test('store: 合并 V4 Flash 新旧 ID，但保持 V4.1 Flash 和 Vision 独立'
     { utc_date: '2026-09-10', model: 'deepseek-v4-pro', api_key_name: 'codex', type: 'output_tokens', amount: 60 },
   ])
   store.upsertCosts([
+    { utc_date: '2026-09-09', model: 'deepseek-v4-flash', api_key_name: 'codex', cost: 0.2, currency: 'CNY' },
+    { utc_date: '2026-09-09', model: 'deepseek-v4-flash-vision-exp', api_key_name: 'codex', cost: 0.3, currency: 'CNY' },
+    { utc_date: '2026-09-09', model: 'deepseek-v4-pro', api_key_name: 'codex', cost: 0.4, currency: 'CNY' },
     { utc_date: '2026-09-10', model: 'deepseek-v4-flash', api_key_name: 'codex', cost: 0.2, currency: 'CNY' },
     { utc_date: '2026-09-10', model: 'deepseek-flash', api_key_name: 'codex', cost: 0.3, currency: 'CNY' },
     { utc_date: '2026-09-10', model: 'deepseek-v4.1-flash', api_key_name: 'codex', cost: 0.7, currency: 'CNY' },
@@ -164,11 +170,14 @@ test('store: 合并 V4 Flash 新旧 ID，但保持 V4.1 Flash 和 Vision 独立'
     { utc_date: '2026-09-10', model: 'deepseek-v4-pro', api_key_name: 'codex', cost: 0.9, currency: 'CNY' },
   ])
   store.upsertHourlyAmounts([
-    { utc_date: '2026-09-10', hour: 8, model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'output_tokens', amount: 7 },
-    { utc_date: '2026-09-10', hour: 8, model: 'deepseek-flash', api_key_name: 'codex', type: 'output_tokens', amount: 11 },
-    { utc_date: '2026-09-10', hour: 8, model: 'deepseek-v4.1-flash', api_key_name: 'codex', type: 'output_tokens', amount: 13 },
-    { utc_date: '2026-09-10', hour: 8, model: 'deepseek-v4-flash-vision-exp', api_key_name: 'codex', type: 'output_tokens', amount: 17 },
-    { utc_date: '2026-09-10', hour: 8, model: 'deepseek-v4-pro', api_key_name: 'codex', type: 'output_tokens', amount: 19 },
+    { utc_date: '2026-09-10', hour: 11, model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'output_tokens', amount: 7 },
+    { utc_date: '2026-09-10', hour: 11, model: 'deepseek-v4-flash-vision-exp', api_key_name: 'codex', type: 'output_tokens', amount: 17 },
+    { utc_date: '2026-09-10', hour: 11, model: 'deepseek-v4-pro', api_key_name: 'codex', type: 'output_tokens', amount: 19 },
+    { utc_date: '2026-09-10', hour: 12, model: 'deepseek-v4-flash', api_key_name: 'codex', type: 'output_tokens', amount: 11 },
+    { utc_date: '2026-09-10', hour: 12, model: 'deepseek-flash', api_key_name: 'codex', type: 'output_tokens', amount: 13 },
+    { utc_date: '2026-09-10', hour: 12, model: 'deepseek-v4.1-flash', api_key_name: 'codex', type: 'output_tokens', amount: 19 },
+    { utc_date: '2026-09-10', hour: 12, model: 'deepseek-v4-flash-vision-exp', api_key_name: 'codex', type: 'output_tokens', amount: 23 },
+    { utc_date: '2026-09-10', hour: 12, model: 'deepseek-v4-pro', api_key_name: 'codex', type: 'output_tokens', amount: 29 },
   ])
 
   const rawModels = [
@@ -185,33 +194,42 @@ test('store: 合并 V4 Flash 新旧 ID，但保持 V4.1 Flash 和 Vision 独立'
     )
   }
 
+  const legacyByModel = store.getDailyByModel('2026-09-09', '2026-09-09')
+  assert.strictEqual(legacyByModel.length, 3)
+  assert.strictEqual(legacyByModel.find((r) => r.model === 'deepseek-v4-flash-legacy').output, 10)
+  assert.strictEqual(legacyByModel.find((r) => r.model === 'deepseek-v4-flash-vision-exp-legacy').output, 20)
+
   const byModel = store.getDailyByModel('2026-09-10', '2026-09-10')
-  assert.strictEqual(byModel.length, 4)
-  const flash = byModel.find((r) => r.model === 'deepseek-v4-flash')
+  assert.strictEqual(byModel.length, 2)
+  const flash = byModel.find((r) => r.model === 'deepseek-v4.1-flash')
   assert.deepStrictEqual(
     { cache_hit: flash.cache_hit, cache_miss: flash.cache_miss, output: flash.output },
-    { cache_hit: 400, cache_miss: 200, output: 30 }
+    { cache_hit: 400, cache_miss: 200, output: 120 }
   )
   assert.ok(Math.abs(flash.cache_hit_rate - (400 / 600 * 100)) < 1e-9)
-  assert.ok(byModel.some((r) => r.model === 'deepseek-v4.1-flash'))
-  assert.ok(byModel.some((r) => r.model === 'deepseek-v4-flash-vision-exp'))
   assert.ok(byModel.some((r) => r.model === 'deepseek-v4-pro'))
 
   const costByModel = store.getDailyCostByModel('2026-09-10', '2026-09-10')
-  assert.strictEqual(costByModel.length, 4)
-  assert.strictEqual(costByModel.find((r) => r.model === 'deepseek-v4-flash').cost, 0.5)
+  assert.strictEqual(costByModel.length, 2)
+  assert.strictEqual(costByModel.find((r) => r.model === 'deepseek-v4.1-flash').cost, 2)
 
-  const modelTotals = store.getModelTotals('2026-09-10', '2026-09-10')
+  const modelTotals = store.getModelTotals('2026-09-09', '2026-09-10')
   assert.strictEqual(modelTotals.length, 4)
-  const flashTotal = modelTotals.find((r) => r.model === 'deepseek-v4-flash')
-  assert.strictEqual(flashTotal.tokens, 630)
-  assert.strictEqual(flashTotal.cost.CNY, 0.5)
+  const flashTotal = modelTotals.find((r) => r.model === 'deepseek-v4.1-flash')
+  assert.strictEqual(flashTotal.tokens, 720)
+  assert.strictEqual(flashTotal.cost.CNY, 2)
+  assert.strictEqual(modelTotals.find((r) => r.model === 'deepseek-v4-flash-legacy').cost.CNY, 0.2)
+  assert.strictEqual(modelTotals.find((r) => r.model === 'deepseek-v4-flash-vision-exp-legacy').cost.CNY, 0.3)
 
+  const beforeObserved = store.getHourlyDetail('2026-09-10', 'model')
+  assert.strictEqual(beforeObserved.series.find((s) => s.name === 'deepseek-v4-flash-legacy').data[12], 11)
+
+  store.setMeta('flash_cutover_observed_at', JSON.stringify({ date: '2026-09-10', hour: 12 }))
   const hourly = store.getHourlyDetail('2026-09-10', 'model')
   assert.strictEqual(hourly.series.length, 4)
-  assert.strictEqual(hourly.series.find((s) => s.name === 'deepseek-v4-flash').data[8], 18)
-  assert.ok(hourly.series.some((s) => s.name === 'deepseek-v4.1-flash'))
-  assert.ok(hourly.series.some((s) => s.name === 'deepseek-v4-flash-vision-exp'))
+  assert.strictEqual(hourly.series.find((s) => s.name === 'deepseek-v4-flash-legacy').data[11], 7)
+  assert.strictEqual(hourly.series.find((s) => s.name === 'deepseek-v4-flash-vision-exp-legacy').data[11], 17)
+  assert.strictEqual(hourly.series.find((s) => s.name === 'deepseek-v4.1-flash').data[12], 66)
   assert.ok(hourly.series.some((s) => s.name === 'deepseek-v4-pro'))
   store.close()
 })

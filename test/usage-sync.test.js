@@ -13,6 +13,7 @@ const DB = path.join(tmpDir, 'test.db')
 const DB3 = path.join(tmpDir, 'test3.db')
 const DB4 = path.join(tmpDir, 'test4.db')
 const DB5 = path.join(tmpDir, 'test5.db')
+const DB6 = path.join(tmpDir, 'test6.db')
 
 test('usage-sync: normalizeAmount 类型映射 + 跳过全零', () => {
   const biz = {
@@ -117,4 +118,37 @@ test('usage-sync: syncBalance 拉取余额并落库', async () => {
   const stored = JSON.parse(store.getMeta('balance_wallets'))
   assert.strictEqual(stored.normal.balance, 48.51)
   store.close()
+})
+
+test('usage-sync: 观测到新 ID 且旧 V4 消失后记录分时切换点', async () => {
+  await store.init(DB6)
+  usage.setRawDir(path.join(tmpDir, 'raw6'))
+  const originalNow = Date.now
+  Date.now = () => Date.UTC(2026, 8, 10, 5, 0, 0)
+  const todayStart = usage.dayStartUnix('2026-09-10')
+  const old = (hour) => ({ time: todayStart + hour * 3600, usage: { RESPONSE_TOKEN: 1 } })
+  const next = { time: todayStart + 12 * 3600, usage: { RESPONSE_TOKEN: 2 } }
+  let mode = 'first'
+  globalThis.fetch = async (url) => {
+    if (url.includes('/cost')) {
+      return { ok: true, text: async () => JSON.stringify({ code: 0, data: { biz_code: 0, biz_data: { data: [] } } }) }
+    }
+    const biz = mode === 'first'
+      ? { series: [
+        { api_key: { name: 'codex' }, model: 'deepseek-v4-flash', buckets: [old(10), old(11)] },
+        { api_key: { name: 'codex' }, model: 'deepseek-flash', buckets: [next] },
+      ] }
+      : { series: [{ api_key: { name: 'codex' }, model: 'deepseek-flash', buckets: [{ time: todayStart + 10 * 3600, usage: { RESPONSE_TOKEN: 3 } }] }] }
+    return { ok: true, text: async () => JSON.stringify({ code: 0, data: { biz_code: 0, biz_data: biz } }) }
+  }
+  try {
+    await usage.syncHourly('tok')
+    assert.strictEqual(store.getMeta('flash_cutover_observed_at'), JSON.stringify({ date: '2026-09-10', hour: 12 }))
+    mode = 'earlier'
+    await usage.syncHourly('tok')
+    assert.strictEqual(store.getMeta('flash_cutover_observed_at'), JSON.stringify({ date: '2026-09-10', hour: 12 }))
+  } finally {
+    Date.now = originalNow
+    store.close()
+  }
 })
