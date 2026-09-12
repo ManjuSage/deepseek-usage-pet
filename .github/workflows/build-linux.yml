@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   appimage:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
