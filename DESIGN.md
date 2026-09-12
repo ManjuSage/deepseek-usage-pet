@@ -86,7 +86,7 @@ meta(key, value)                                                          -- 账
 14. **缩放/多屏适配**：小屏动态限制最大缩放；多显示器镜像锚点随屏更新；跨屏钳制统一 `getDisplayMatching`；缩放用一次原子 `setBounds`（避免 `setSize`+`setPosition` 竞态导致位移受限/漂移）。
 15. **运行日志**：`lib/log.js` 写 `pet.log`，默认 info，`WHALE_PET_LOG_LEVEL`/`WHALE_PET_TRACE` 开 debug；`redact()` 掩码密钥；`config.readFile` 不打日志防递归。Windows 终端用 `chcp`+`iconv-lite` 按本机代码页编码，文件保持 UTF-8。
 16. **图表颜色统一**：`FIXED_COLORS` 给已知模型/类型/费用线固定色（Tableau 10 风格），未知模型与 API Key 从 `FALLBACK` 按名称排序分配；`rebuildColorMap()` 在加载日级/分时数据后重建。所有图表（每日走势/分时明细/饼图）统一走 `colorFor()`。
-17. **Linux AppImage 走 CI**：`.github/workflows/build-linux.yml` 在 `v*` tag 时用 Ubuntu runner 构建 AppImage 并挂到 Release；Windows 本机只出 Windows 产物。
+17. **Linux AppImage 发布约束**：`.github/workflows/build-linux.yml` 的自动构建与发布仅作为历史实现保留。从下一版本开始，AppImage 必须在用户控制的 Linux 环境中本地构建，并由项目所有者本人账号手动上传；不得使用 GitHub Actions 或机器人账号代为发布。
 18. **「总体」时间范围**：预设按钮 `data-days="all"` 表示全部已记录数据，范围取 `getDateRange()`（`UNION ALL` 同时扫 `amount_daily` 与 `cost_daily`）。
 19. **热力图年份翻页**：`state.heatmapYear` 记录当前年，`heatmapRangeFor(year)` 补齐到完整周（周一~周日），使每年都是整周数、热力图呈规整长方形；`<`/`>` 按钮放在标题栏，避免挤占图表宽度。
 20. **输入缓存命中率口径**：`缓存命中输入 Tokens ÷（缓存命中输入 Tokens + 缓存未命中输入 Tokens）`；输出 Tokens 不进入分母，无输入时返回空值并在界面显示 `—`。
@@ -117,6 +117,7 @@ DeepseekAPIUsagePet/
 - 产物两种：`nsis`（向导式安装包）+ `portable`（免安装便携版）。
 - 安装包配置见 `package.json` 的 `build.nsis`：向导式（`oneClick:false`）、安装范围可选（`perMachine:false`）、可选安装目录、中文语言包（`zh_CN` / `en_US`）、桌面 + 开始菜单快捷方式。
 - Chromium 运行时仅打包 `zh-CN` / `en-US` locale；`assets/DSH2.png`、`assets/DSniang02.png` 仅供仓库文档使用，不进入应用包。
-- 输出目录：`dist/installer/`（安装包）、`dist/portable/`（便携版 exe + 单文件便携版 zip + win-unpacked）。
+- 输出目录：`dist/installer/`（安装包）、`dist/portable/`（便携版 exe + 历史兼容 zip + win-unpacked）。从下一版本开始，Release 直接上传便携版单文件 exe，不再压缩或上传 zip。
+- 代码推送、仓库更新、标签、Release 和发布资产必须使用项目所有者 `ManjuSage` 本人账号及其 GitHub 隐私邮箱 `84658164+ManjuSage@users.noreply.github.com`；禁止 GitHub Actions、Codex、Claude、其他 AI / Bot 账号，以及幽灵账号 `noreply` / `noreply@users.noreply.github.com` 执行这些操作。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，不阻塞运行（更多信息 → 仍要运行）。
 - electron-builder 26 的部分二进制 npmmirror 可能缺失，需从 GitHub 手动下载到 `%LOCALAPPDATA%\electron-builder\Cache`。

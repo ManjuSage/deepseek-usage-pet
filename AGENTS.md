@@ -71,7 +71,7 @@ test/               单元测试（node --test）
 17. **运行日志**：`lib/log.js` 写 `pet.log`（1MB 轮转），默认 info；`WHALE_PET_LOG_LEVEL` / `WHALE_PET_TRACE=1` 打开 debug。所有进日志的字符串先 `redact()` 掩码密钥。`config.readFile()` 不打日志（避免 `secrets()→getEffective()→readFile()→log` 递归），`secrets()` 有重入保护。
 18. **Windows 终端乱码**：中文 Windows 控制台是 GBK，直接 `console.log` 中文会乱码。`log.js` 用 `chcp` 检测代码页，`iconv-lite` 把终端回显按对应编码（gbk/big5/...）写字节；文件仍写 UTF-8。
 19. **用量图表颜色统一**：`renderer/usage.js` 里不再用「首次出现才分配」的 `modelColor()`。改为 `FIXED_COLORS`（已知模型/类型/费用线固定色，Tableau 10 风格）+ `FALLBACK`（未知模型/API Key 按名称排序分配）。分时明细的模型名也要先过 `modelLabel` 再取色，否则会出现 `deepseek-v4-pro` 与 `V4 Pro` 两个 key、颜色对不上。
-20. **Linux AppImage 用 CI 构建**：Windows 本机无法直接出 AppImage，`.github/workflows/build-linux.yml` 在推送 `v*` tag 时用 Ubuntu runner 跑 `electron-builder --linux AppImage`，并用 `softprops/action-gh-release` 挂到同名 Release。
+20. **Linux AppImage 的历史自动构建**：`.github/workflows/build-linux.yml` 曾在推送 `v*` tag 时用 Ubuntu runner 构建并上传 AppImage。该流程仅作为历史实现保留；从下一版本开始禁止再用 GitHub Actions 构建、上传或创建 Release。Linux 产物必须在用户控制的 Linux 环境中本地构建，再由用户本人账号手动上传；若当前环境无法构建，应暂停并请用户决定，不得回退到机器人发布。
 21. **「总体」时间范围**：预设按钮里 `data-days="all"` 表示全部已记录数据，范围取 `usage:summary` 返回的 `range`（`getDateRange()`）。`getDateRange()` 用 `UNION ALL` 同时扫 `amount_daily` 和 `cost_daily`，避免只有费用没有 token 的日期漏掉。
 22. **热力图年份翻页 + 补齐整周**：`state.heatmapYear` 记录当前查看的年份，`heatmapRangeFor(year)` 返回 `[1月1日前最近的周一, 12月31日后最近的周日]`，让每年都是整周数、热力图呈规整长方形。`<`/`>` 按钮放在标题栏 `.heatmap-nav-group` 里（不放图表两侧，避免挤压图表宽度导致标签被裁）。
 
@@ -80,12 +80,25 @@ test/               单元测试（node --test）
 - `build.win.target = ["nsis", "portable"]`：一次产出安装包 + 便携版。
 - 安装包：NSIS 向导式（`oneClick:false`），`perMachine:false` 提供「仅当前用户 / 所有用户」选择页，`installerLanguages: ["zh_CN", "en_US"]` 中文优先，可选安装目录 + 桌面/开始菜单快捷方式。
 - Chromium 运行时语言资源只保留 `zh-CN` / `en-US`；README 使用的 `DSH2.png`、`DSniang02.png` 不进入安装包。
-- 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + 单文件便携版 zip + win-unpacked）。
-- **发布上传范围**：Release 只上传「安装包 Setup exe」+「便携版 zip」；**不上传便携版单文件 exe**。AppImage 由 CI 自动挂上。
-- Linux 产物：AppImage 由 GitHub Actions 在 `v*` tag 时自动构建并挂 Release（`softprops/action-gh-release`）；也可在 Linux 上手动 `npm run dist:linux`。
+- 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + 历史兼容 zip + win-unpacked）。当前脚本仍可能生成 zip，但后续发布不再使用该 zip。
+- **从下一版本开始的发布上传范围**：Release 只上传「安装包 Setup exe」+「便携版单文件 exe」；便携版已经是单文件，**不得再压缩成 zip，也不得上传 zip**。
+- Linux 产物：在用户控制的 Linux 环境中手动执行 `npm run dist:linux` 构建，并由用户本人账号上传；不得使用 GitHub Actions 代为构建或上传。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，需用户点「更多信息 → 仍要运行」。
 - 打包联网下载 NSIS 工具链 / Electron 用 npmmirror 镜像（直接 GitHub 可能失败）。
 - electron-builder 26 需要下载 `icons` / `nsis` / `7zip` / `nsis-resources` 等二进制，npmmirror 镜像可能缺（404），需从 GitHub 手动下载放进 `%LOCALAPPDATA%\electron-builder\Cache`。
+
+## GitHub 身份与发布权限（强制）
+
+以下规则适用于后续所有代码上传、仓库更新、Git 标签和产品发布，不得由 Agent 自行放宽：
+
+- GitHub 操作只能使用项目所有者本人的账号 **`ManjuSage`**。提交作者、提交者、标签签署者和 Release 发布者都必须是用户本人。
+- 禁止使用 `github-actions[bot]`、GitHub Actions、OpenAI Codex、Claude 或任何其他 AI / Bot / 自动化账号执行 `commit`、`push`、仓库更新、创建标签、创建或修改 Release、上传发布资产。
+- 用户本人的 GitHub 隐私邮箱 **`84658164+ManjuSage@users.noreply.github.com`** 是合法且必须保留的提交邮箱；它与幽灵账号 `noreply` 无关。
+- 明确禁止使用 GitHub 账号 [`noreply`](https://github.com/noreply)、邮箱 `noreply@users.noreply.github.com`、`noreply@openai.com`，以及其他不属于用户本人的幽灵 / 机器人身份。
+- 禁止添加任何 AI 的 `Co-Authored-By`、`Signed-off-by` 或类似署名。提交历史只保留用户本人身份。
+- 执行任何远端写操作前，必须同时核对 `git config user.name`、`git config user.email` 和当前 GitHub 鉴权账号；用户名必须为 `ManjuSage`，邮箱必须为 `84658164+ManjuSage@users.noreply.github.com`，远端账号也必须为 `ManjuSage`。任一项不符合时立即停止并请用户处理，不得用机器人账号兜底。
+- 现有 `.github/workflows/build-linux.yml` 属历史遗留。下一次发布前必须先停用或移除其自动发布路径，且不得通过推送标签触发它代为创建 Release 或上传资产。
+- 发布流程必须由用户本人凭据完成：本地验证与打包 → 本人身份提交和推送 → 本人身份创建标签与 Release → 本人身份上传 Setup exe、便携版单文件 exe，以及按需本地构建的其他平台产物。
 
 ## 版本发布规范（SemVer）
 

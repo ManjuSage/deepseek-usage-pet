@@ -157,14 +157,16 @@ DeepseekAPIUsagePet/
 
 ## 打包与分发
 
-支持两种 Windows 产物，`npm run dist:win` 一次生成（会自动整理到 installer / portable 目录并生成便携版 zip）：
+支持两种 Windows 产物，`npm run dist:win` 一次生成（会自动整理到 installer / portable 目录；当前脚本仍会生成历史兼容 zip）：
 
 | 产物 | 位置 | 说明 |
 |---|---|---|
 | 安装包 | `dist/installer/` | NSIS 向导式安装：可选安装目录、可选「仅当前用户 / 所有用户」、中文界面、自动创建桌面与开始菜单快捷方式 |
-| 便携版 | `dist/portable/` | 免安装：单文件 exe + Release 用 zip（解压后仍为单文件 exe） |
+| 便携版 | `dist/portable/` | 免安装：单文件 exe；当前脚本生成的 zip 仅为历史兼容产物 |
 
-Linux 的 **AppImage** 由 GitHub Actions 在发布 tag 时自动构建，并挂到对应 Release（见 `.github/workflows/build-linux.yml`）。也可在 Linux 上手动执行 `npm run dist:linux` 构建。
+> **从下一版本开始的发布规则**：Release 直接上传 Windows Setup exe 与便携版单文件 exe，不再压缩或上传便携 zip。代码推送、仓库更新、标签、Release 和资产上传只能使用项目所有者 `ManjuSage` 本人账号及其 GitHub 隐私邮箱 `84658164+ManjuSage@users.noreply.github.com`；不得使用 GitHub Actions、Codex、Claude、其他 AI / Bot 账号，也不得使用幽灵账号 `noreply` 或 `noreply@users.noreply.github.com`。
+
+Linux 的 **AppImage** 后续必须在用户控制的 Linux 环境中手动执行 `npm run dist:linux` 构建，再由用户本人账号上传。现有 `.github/workflows/build-linux.yml` 是历史遗留流程，下一次发布前必须停用或移除其自动发布路径，不得再用它创建 Release 或上传资产。
 
 > 联网下载 Electron / NSIS 工具链时建议走 npmmirror 镜像，避免直连 GitHub 失败：
 >
