@@ -370,16 +370,16 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="390" y="184" class="t-muted" font-size="9" text-anchor="middle">lib/usage-sync.js</text>
         </g>
 
-        <g id="node-store" data-node-id="store" data-node-label="SQLite (sql.js)" tabindex="0" role="button" aria-label="聚焦SQLite (sql.js)，usage.db · 原子落盘, Electron 主进程（Node.js · 特权）" aria-pressed="false" data-node-kind="database" data-node-sublabel="usage.db · 原子落盘" data-node-context="Electron 主进程（Node.js · 特权）" style="">
-          <title>SQLite (sql.js) · usage.db · 原子落盘 · Electron 主进程（Node.js · 特权）</title>
+        <g id="node-store" data-node-id="store" data-node-label="SQLite (node:sqlite)" tabindex="0" role="button" aria-label="聚焦SQLite (node:sqlite)，usage.db · 直接写入, Electron 主进程（Node.js · 特权）" aria-pressed="false" data-node-kind="database" data-node-sublabel="usage.db · 直接写入" data-node-context="Electron 主进程（Node.js · 特权）" style="">
+          <title>SQLite (node:sqlite) · usage.db · 直接写入 · Electron 主进程（Node.js · 特权）</title>
           <rect x="570" y="140" width="150" height="60" rx="6" class="c-mask"/>
           <rect x="570" y="140" width="150" height="60" rx="6" class="c-database" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(576 146) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" x="645" y="168" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">SQLite (sql.js)</text>
-        <text x="645" y="184" class="t-muted" font-size="9" text-anchor="middle">usage.db · 原子落盘</text>
+          <text data-node-label="" x="645" y="168" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">SQLite (node:sqlite)</text>
+        <text x="645" y="184" class="t-muted" font-size="9" text-anchor="middle">usage.db · 直接写入</text>
         </g>
 
         <g id="node-balance" data-node-id="balance" data-node-label="BalanceService" tabindex="0" role="button" aria-label="聚焦BalanceService，lib/balance.js · 25s TTL, Electron 主进程（Node.js · 特权）" aria-pressed="false" data-node-kind="backend" data-node-sublabel="lib/balance.js · 25s TTL" data-node-context="Electron 主进程（Node.js · 特权）" style="">

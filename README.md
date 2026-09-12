@@ -8,7 +8,7 @@
 
 ## 架构概览
 
-整体是一个 Electron 桌面应用，采用「**主进程（Node.js 特权）** + **渲染进程沙箱**（contextIsolation）」的双层结构，二者通过 `preload.js` 的 contextBridge（`window.whaleAPI`）安全通信。核心运行时包括：主进程 `main.js`（窗口 / 托盘 / IPC / 登录 / 同步）、官方余额 API 的 `BalanceService`、平台私有接口的 `UsageSync`、本地 **sql.js SQLite** 存储，以及桌宠 / 设置 / 用量统计三个渲染窗口。托盘、记账「对账取大」、启动自动同步、config 0600 等支持性细节放在底部卡片，未额外堆连线。外部依赖为 `api.deepseek.com`（余额）与 `platform.deepseek.com`（用量 / 令牌）。
+整体是一个 Electron 桌面应用，采用「**主进程（Node.js 特权）** + **渲染进程沙箱**（contextIsolation）」的双层结构，二者通过 `preload.js` 的 contextBridge（`window.whaleAPI`）安全通信。核心运行时包括：主进程 `main.js`（窗口 / 托盘 / IPC / 登录 / 同步）、官方余额 API 的 `BalanceService`、平台私有接口的 `UsageSync`、Electron 39 内置的 **node:sqlite** 存储，以及桌宠 / 设置 / 用量统计三个渲染窗口。托盘、记账「对账取大」、启动自动同步、config 0600 等支持性细节放在底部卡片，未额外堆连线。外部依赖为 `api.deepseek.com`（余额）与 `platform.deepseek.com`（用量 / 令牌）。
 
 ![仓库架构概览](docs/images/architecture.svg)
 
@@ -125,7 +125,7 @@ npm start
 ```text
 whale-pet/
 ├── config.json    # 全部设置（含 API Key / platformToken）
-├── usage.db       # sql.js SQLite：日级/分时用量、余额快照、上次同步时间
+├── usage.db       # SQLite：日级/分时用量、余额快照、上次同步时间
 ├── usage.json     # 记账账本（余额差值累计今日用量，跨天归档 30 天）
 ├── lines.json     # 随机台词池（首次自动生成）
 ├── pet.log        # 运行日志（1MB 轮转，旧日志 pet.log.1）
@@ -144,7 +144,7 @@ DeepseekAPIUsagePet/
 │   ├── ledger.js      # 小鲸鱼记账（余额差值）
 │   ├── lines.js       # 随机台词池
 │   ├── log.js         # 文件日志（pet.log 轮转 + 终端回显 + 密钥掩码）
-│   ├── store.js       # sql.js 存储层（schema + upsert + 查询）
+│   ├── store.js       # node:sqlite 存储层（schema + upsert + 查询）
 │   └── usage-sync.js  # 平台私有接口 → 用量回填/分时/余额/账号指纹
 ├── renderer/
 │   ├── pet.*          # 鲸鱼桌宠窗口
@@ -162,7 +162,7 @@ DeepseekAPIUsagePet/
 | 产物 | 位置 | 说明 |
 |---|---|---|
 | 安装包 | `dist/installer/` | NSIS 向导式安装：可选安装目录、可选「仅当前用户 / 所有用户」、中文界面、自动创建桌面与开始菜单快捷方式 |
-| 便携版 | `dist/portable/` | 免安装：单文件 exe + zip（解压即用） |
+| 便携版 | `dist/portable/` | 免安装：单文件 exe + Release 用 zip（解压后仍为单文件 exe） |
 
 Linux 的 **AppImage** 由 GitHub Actions 在发布 tag 时自动构建，并挂到对应 Release（见 `.github/workflows/build-linux.yml`）。也可在 Linux 上手动执行 `npm run dist:linux` 构建。
 
@@ -175,6 +175,8 @@ Linux 的 **AppImage** 由 GitHub Actions 在发布 tag 时自动构建，并挂
 > ```
 
 > 安装包未做代码签名：首次双击时 Windows SmartScreen 会提示「未知发布者」，点「更多信息 → 仍要运行」即可。
+
+> Windows 包只携带 `zh-CN` / `en-US` Chromium 语言资源；README 封面等非运行时图片不会打进应用包。
 
 > 打包使用 electron-builder 26；其部分二进制 npmmirror 镜像可能缺失，首次在本机打包需从 GitHub 手动补下载（见 [AGENTS.md](AGENTS.md)）。
 
@@ -193,9 +195,9 @@ npm run dist:linux # 打包 Linux 产物（AppImage/deb/rpm/tar.gz，需在 Linu
 
 - **「每轮对话花费」已移除**：DeepSeek 官网明示「数据可能有 5 分钟延迟」，余额差值无法精确到单轮。
 - 平台**分时数据只保留今天 + 昨天**，但本程序会本地累积保存，同步过的更早日期仍可看分时。
-- 存储用 **sql.js（WASM）** 而非 better-sqlite3（原生模块有 NAPI 兼容问题）。
+- 存储使用 Electron 39 随附的 **node:sqlite**，不再加载 WASM 或把整库导出落盘，也不需要原生模块编译。
 - 运行环境 **Electron 39**（已从 34 升级，修复运行时 CVE）。
-- 已**禁用硬件加速**以降低内存占用（约省 260MB）。
+- 保持**禁用硬件加速**以降低 GPU 进程内存；鲸鱼闲置时暂停呼吸动画，窗口隐藏后恢复 Chromium 后台节流。
 - **鼠标穿透在 Linux Wayland / XWayland 下不可用**：`setIgnoreMouseEvents` 与 `setShape` 在这些环境下不可靠，请在系统登录会话改用 **X11**（或在桌面环境设置里关闭 Wayland）后再使用穿透功能。
 
 ## 与父项目 / 原版的差异
@@ -210,9 +212,9 @@ npm run dist:linux # 打包 Linux 产物（AppImage/deb/rpm/tar.gz，需在 Linu
 | 平台令牌登录 | DSH 凭据服务 | 手动粘贴 | **登录窗自动提取** + 手动粘贴兜底 |
 | 系统集成 | 无（依托 DSH） | 托盘 + 全局热键 + 通知 + 单实例 | 同左 + **显示/隐藏勾选** + **用量统计入口** |
 | 点击穿透 | 页面透明区穿透 | `setShape` 窗口裁剪 | `setShape`（**修复 width/height 参数**）+ 命中区贴合轮廓 |
-| 存储 | `$DSH_HOME/*.json` | `config.json` + `usage.json` | `config.json` + **sql.js SQLite**（`usage.db`） |
+| 存储 | `$DSH_HOME/*.json` | `config.json` + `usage.json` | `config.json` + **node:sqlite**（`usage.db`） |
 | 图表 | 无 | 无 | **ECharts** |
-| 内存优化 | — | — | **禁用硬件加速** + 设置窗口按需创建 |
+| 内存优化 | — | — | **禁用硬件加速** + 音效延迟加载 + 设置窗口关闭即释放 + 闲置动画暂停 |
 
 ## 更新日志
 

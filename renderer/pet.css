@@ -46,7 +46,8 @@ html, body {
   height: 100%;
   animation: wp-breathe 2s ease-in-out infinite;
 }
-.wp-root.wp-dragging .wp-breath { animation-play-state: paused; }
+.wp-root.wp-dragging .wp-breath,
+.wp-root.wp-idle .wp-breath { animation-play-state: paused; }
 @keyframes wp-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.02); }

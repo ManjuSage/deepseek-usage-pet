@@ -1,7 +1,7 @@
 {
   "name": "deepseek-usage-pet",
   "productName": "DeepSeek Usage Pet",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "DeepSeek 桌面小鲸鱼桌宠：余额监控 + 用量统计面板（日级/分时图表、历史回填、充值余额、同步时间）",
   "main": "main.js",
   "author": {
@@ -39,7 +39,13 @@
       "lib/**",
       "renderer/**",
       "assets/**",
+      "!assets/DSH2.png",
+      "!assets/DSniang02.png",
       "package.json"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
     ],
     "linux": {
       "target": [
@@ -89,7 +95,6 @@
     "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "dependencies": {
-    "iconv-lite": "^0.7.3",
-    "sql.js": "^1.14.2"
+    "iconv-lite": "^0.7.3"
   }
 }

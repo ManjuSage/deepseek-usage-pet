@@ -1,7 +1,7 @@
 # DeepSeek API Usage Pet — 设计文档
 
 > 状态：已实现
-> 更新日期：2026-09-09
+> 更新日期：2026-09-12
 > 版本历史：见 [CHANGELOG.md](CHANGELOG.md)
 
 ## 1. 项目定位
@@ -18,8 +18,8 @@
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| Electron | `^39.0.0` | 无 `node:sqlite` |
-| SQLite 驱动 | `sql.js`（WASM） | better-sqlite3 因 NAPI/编译问题不可用 |
+| Electron | `^39.0.0` | 随附 Node.js 22，可用 `node:sqlite` |
+| SQLite 驱动 | `node:sqlite` | Electron 内置，无 WASM 常驻内存与原生模块编译 |
 | 图表 | ECharts（`renderer/echarts.min.js`） | 复用 33March7/deepseek-api-usage-statistics（Unlicense） |
 | 语言 | 原生 JS（无框架/打包器） | `npm start` 直接跑 |
 
@@ -46,7 +46,7 @@
 
 计费类型映射：`PROMPT_CACHE_HIT_TOKEN→input_cache_hit_tokens`、`PROMPT_CACHE_MISS_TOKEN→input_cache_miss_tokens`、`RESPONSE_TOKEN→output_tokens`、`REQUEST→request_count`。
 
-## 4. 存储设计（sql.js SQLite）
+## 4. 存储设计（node:sqlite）
 
 ```sql
 amount_daily(utc_date, model, api_key_name, type, amount, price)          -- 日级用量
@@ -70,16 +70,16 @@ meta(key, value)                                                          -- 账
 
 ## 6. 关键决策
 
-1. **sql.js 而非 better-sqlite3**：better-sqlite3 原生模块有 NAPI 兼容问题，且本机缺 ClangCL 编译失败。
+1. **内置 node:sqlite**：Electron 39 随附的 Node.js 22 已提供 `DatabaseSync`；直接读写既有 `usage.db`，不加载 WASM、不做原生模块编译，也不再整库 export。
 2. **`setShape` 传 `{x,y,width,height}` 整数**：传 `{w,h}` 或浮点会使 shape 无效、全窗口拦截鼠标。
 3. **平台令牌**：登录窗自动提取（localStorage `userToken` 等）+ 手动粘贴兜底。
 4. **历史回填**：30 天一段往回回溯，遇连续两段空即停。
 5. **移除「每轮花费」**：DeepSeek 明示「数据可能有 5 分钟延迟」，余额差值无法精确到单轮。
-6. **`disableHardwareAcceleration`**：图形简单，软件渲染省约 260MB。
+6. **`disableHardwareAcceleration` + 闲置节流**：图形简单，保留软件渲染以降低 GPU 进程内存；闲置时暂停呼吸动画，隐藏窗口交给 Chromium 后台节流。
 7. **范围选择**：近 7 天默认 + 30/90/365 + 自定义日期（预设按钮 + 始终可见的日期输入框）。
 8. **记账对账取大**：配置平台令牌时，记账模式每次刷新取「余额差值 vs 平台今日实际费用」较大值。
 9. **启动自动同步**：启动 + 每小时检查，超 12h 做一次轻量同步（不含历史回填），`autoSync` 可关。
-10. **SQLite 批量落盘**：`beginBatch()/flush()` 让一次同步只落盘一次。
+10. **SQLite 事务写入**：`upsertMany()` 用事务批量写入；`beginBatch()/flush()` 仅保留为同步层兼容接口。
 11. **费用以平台账单为准**：桌宠今日已用直接汇总平台 `cost` 接口，不在本地维护模型价目表，自动适应价格调整和模型路由变化；接口失败时回落余额差值记账。
 12. **安全加固与 CSP 收紧**：密钥掩码、openPath 白名单、登录窗护栏（权限请求用 `session.setPermissionRequestHandler`）、raw 留存上限、三页 `object-src/base-uri/connect-src 'none'`。
 13. **镜像翻转**：`mirror` 默认开启，方向感知自动镜像（整窗 `scaleX(-1)`，鲸鱼+气泡一起翻、文字/动图反向翻回，旋转中心为两者合起来的中部）；关闭=锁定当前方向；重启回默认。
@@ -95,6 +95,7 @@ meta(key, value)                                                          -- 账
 ## 7. 风险与缓解
 
 - 私有接口无文档、可能变动、token 过期：原始响应存档 + 结构变化报错 + 降级。
+- `node:sqlite` 在 Electron 39 随附的 Node.js 22 中仍标记为实验性 API：发布前以真实旧库、单元测试和打包后冒烟共同验证。
 - 账号混数据：账号指纹检测。
 - 分时限制：平台只保留今昨，但本地会累积保存；未在窗口内同步过的日期无分时（面板提示「无保存的分时数据」）。
 - 鼠标穿透平台差异：Windows/macOS 用 `setIgnoreMouseEvents`，Linux/X11 用空 `setShape`；Wayland/XWayland 下不可靠，需用户改用 X11 会话。
@@ -115,6 +116,7 @@ DeepseekAPIUsagePet/
 
 - 产物两种：`nsis`（向导式安装包）+ `portable`（免安装便携版）。
 - 安装包配置见 `package.json` 的 `build.nsis`：向导式（`oneClick:false`）、安装范围可选（`perMachine:false`）、可选安装目录、中文语言包（`zh_CN` / `en_US`）、桌面 + 开始菜单快捷方式。
-- 输出目录：`dist/installer/`（安装包）、`dist/portable/`（便携版 exe + zip + win-unpacked）。
+- Chromium 运行时仅打包 `zh-CN` / `en-US` locale；`assets/DSH2.png`、`assets/DSniang02.png` 仅供仓库文档使用，不进入应用包。
+- 输出目录：`dist/installer/`（安装包）、`dist/portable/`（便携版 exe + 单文件便携版 zip + win-unpacked）。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，不阻塞运行（更多信息 → 仍要运行）。
 - electron-builder 26 的部分二进制 npmmirror 可能缺失，需从 GitHub 手动下载到 `%LOCALAPPDATA%\electron-builder\Cache`。

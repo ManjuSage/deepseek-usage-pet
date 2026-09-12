@@ -9,7 +9,7 @@ on:
       release_tag:
         description: '要补充资产的 Release 标签'
         required: true
-        default: 'v1.2.2'
+        default: 'v1.2.3'
 
 permissions:
   contents: write

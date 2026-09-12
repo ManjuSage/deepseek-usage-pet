@@ -152,7 +152,6 @@ function createPetWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      backgroundThrottling: false,
       autoplayPolicy: 'no-user-gesture-required',
       spellcheck: false,
     },
@@ -1044,7 +1043,7 @@ function registerIpc() {
   // ---------- 设置窗口 ----------
   ipcMain.on('menu:open', () => openMenu())
   ipcMain.on('menu:close', () => {
-    if (menuWin && !menuWin.isDestroyed()) menuWin.hide()
+    if (menuWin && !menuWin.isDestroyed()) menuWin.close()
   })
 
   // ---------- 用系统默认程序打开文件/目录/URL（设置里的「打开」按钮）----------
@@ -1265,9 +1264,10 @@ async function runSmoke() {
   await new Promise((r) => setTimeout(r, 700))
   await capturer(menuWin, 'smoke-menu.png')
 
-  // ④ 设置窗被直接叉掉后：应能按需重建并再次打开，且默认居中（不被大鲸鱼遮挡）
+  // ④ 设置窗通过页面关闭后：应释放渲染进程、按需重建并再次打开，且默认居中（不被大鲸鱼遮挡）
   try {
-    menuWin.close()
+    const oldMenuWebContentsId = menuWin.webContents.id
+    await withTimeout(menuWin.webContents.executeJavaScript('window.whaleAPI.closeMenu()', true), 2000, null)
     await new Promise((r) => setTimeout(r, 500))
     openMenu()
     await new Promise((r) => setTimeout(r, 600))
@@ -1276,7 +1276,7 @@ async function runSmoke() {
     const cx = d.bounds.x + d.bounds.width / 2
     const cy = d.bounds.y + d.bounds.height / 2
     results.menuReopen = mb ? {
-      recreated: true,
+      recreated: menuWin.webContents.id !== oldMenuWebContentsId,
       visible: menuWin.isVisible(),
       // center() 包含系统标题栏高度（约 1 位数十 px），容忍 30px
       centered: Math.abs((mb.x + mb.width / 2) - cx) <= 8 && Math.abs((mb.y + mb.height / 2) - cy) <= 30,

@@ -12,6 +12,7 @@ const DB = path.join(tmpDir, 'test.db')
 const DB2 = path.join(tmpDir, 'test2.db')
 const DB3 = path.join(tmpDir, 'test3.db')
 const DB4 = path.join(tmpDir, 'test4.db')
+const DB5 = path.join(tmpDir, 'test5.db')
 
 test('store: 建库 + upsert 去重 + 持久化重载 + meta', async () => {
   await store.init(DB)
@@ -140,6 +141,18 @@ test('store: 无输入 token 时缓存命中率为空', async () => {
   assert.strictEqual(totals.length, 1)
   assert.strictEqual(totals[0].cache_hit_rate, null)
   assert.strictEqual(store.getSummary().cache_hit_rate, null)
+  store.close()
+})
+
+test('store: 损坏数据库会备份后重建', async () => {
+  fs.writeFileSync(DB5, 'not a sqlite database')
+
+  await store.init(DB5)
+
+  assert.strictEqual(store.queryAll('SELECT COUNT(*) AS c FROM meta')[0].c, 0)
+  const backups = fs.readdirSync(tmpDir).filter((name) => name.startsWith('test5.db.corrupt-'))
+  assert.strictEqual(backups.length, 1)
+  assert.strictEqual(fs.readFileSync(path.join(tmpDir, backups[0]), 'utf8'), 'not a sqlite database')
   store.close()
 })
 

@@ -10,7 +10,7 @@
 
 - Electron `^39.0.0`
 - 原生 JS（无框架、无打包器），`npm start` 直接跑
-- **sql.js**（WASM 版 SQLite，避免原生模块编译/ABI 问题）
+- Electron 内置 **node:sqlite**（直接文件读写，无 WASM / 原生模块编译）
 - ECharts（用量面板图表，`renderer/echarts.min.js`）
 
 ## 架构
@@ -24,7 +24,7 @@ lib/
   ledger.js         「小鲸鱼记账」：余额差值累计今日用量
   lines.js          随机台词池（lines.json）
   log.js            文件日志（pet.log 轮转 + 终端回显 + 密钥掩码）
-  store.js          sql.js 存储层：schema + upsert + 查询
+  store.js          node:sqlite 存储层：schema + upsert + 查询
   usage-sync.js     平台私有接口 → 用量回填/分时/余额/账号指纹
 renderer/
   pet.*             鲸鱼桌宠窗口（气泡/拖拽/命中区/呼吸动画）
@@ -44,7 +44,7 @@ test/               单元测试（node --test）
 ## 数据与存储
 
 - 配置：`%APPDATA%/whale-pet/config.json`（Windows，Linux/macOS 见 `lib/config.js`）
-- 用量：`%APPDATA%/whale-pet/usage.db`（sql.js SQLite）
+- 用量：`%APPDATA%/whale-pet/usage.db`（node:sqlite）
   - `amount_daily` / `cost_daily`：日级用量/费用
   - `hourly_usage` / `hourly_cost`：分时（平台只保留今天+昨天）
   - `meta`：账号指纹、余额快照、上次同步时间等
@@ -52,16 +52,16 @@ test/               单元测试（node --test）
 
 ## 关键决策与踩坑（务必先读）
 
-1. **用 sql.js 而不是 better-sqlite3**：better-sqlite3 原生模块有 NAPI 版本兼容问题，且本机缺 ClangCL 编译失败。sql.js 是 WASM，零编译零 ABI 问题。
+1. **使用内置 node:sqlite**：Electron 39 随附 Node.js 22，`DatabaseSync` 可直接读写现有 `usage.db`；不再加载 sql.js WASM、整库 export 或编译 better-sqlite3。该 API 在此 Node 版本仍标记为实验性，发布前必须跑真实旧库兼容检查与打包后冒烟。
 2. **`setShape` 必须传 `{x, y, width, height}` 且为整数**：传 `{w,h}` 或浮点会导致 shape 无效，整个窗口拦截鼠标（透明区「失效」）。见 `main.js sanitizeRects()`。
 3. **气泡淡出后再裁剪窗口**：`hideBubble()` 里延迟 520ms 再 `reportShape()`，否则气泡被矩形边界硬切。
 4. **分时数据平台只保留今天+昨天**：程序每次同步把「今昨」分时 upsert 进 SQLite 并持续累积，面板能显示已累积的更早分时（前提是该日期在两天窗口内同步过）；没存到的日期才提示「无保存的分时数据」。
 5. **「每轮花费」已移除**：DeepSeek 官网明示「数据可能有 5 分钟延迟」，余额差值无法精确到单轮，故该功能及 `turn_ledger`、`notify-bridge` 均已删除。
-6. **`app.disableHardwareAcceleration()`**：桌宠图形简单，禁用硬件加速省约 260MB 内存（GPU 进程从 ~317MB 降到 ~54MB）。
+6. **`app.disableHardwareAcceleration()` + 闲置节流**：桌宠图形简单，保留软件渲染以降低 GPU 进程内存；鲸鱼进入闲置状态时暂停呼吸动画，隐藏窗口使用 Chromium 默认后台节流。
 7. **GMT+8**：平台用量按 GMT+8 分日桶，所有日期计算统一用 `TZ_OFFSET_SEC = 8*3600`（`lib/usage-sync.js`）。
 8. **记账模式「对账取大」**：配置了平台令牌时，记账模式每次刷新用「余额差值 vs 平台今日用量」取较大值，补齐未运行期间的花费；未配令牌则只有余额差值（会漏掉当天首次启动前已产生的花费）。
 9. **启动自动同步**：启动时 + 每小时检查一次，距上次同步超 12h 且配置令牌就做一次「轻量同步」（近两天日级 + 今昨分时 + 余额，不含历史回填）；设置里 `autoSync` 可开关。
-10. **SQLite 批量落盘**：`store.beginBatch()/flush()` 让一次同步只全库导出落盘一次，避免每行写都 export。
+10. **SQLite 事务写入**：`store.upsertMany()` 在事务中批量写入；`beginBatch()/flush()` 仅保留为同步层兼容接口。
 11. **费用以平台账单为准**：桌宠“今日已用”直接汇总平台 `/api/v0/usage/by_api_key/cost` 的实际费用，不再用 token 数量乘本地价目表；因此能自动适应价格调整和 Pro→Flash 等模型路由变化。接口失败时沿用余额差值记账回退。
 12. **安全加固**：`config:get` 对非设置窗口掩码密钥；`shell:open-path` 白名单；登录窗限制导航/弹窗/权限；原始响应存档上限 100 份（目录 0700 / 文件 0600）。注意权限请求处理器是 **`session.setPermissionRequestHandler`**（不是 `webContents` 的方法），写错会导致登录窗空白。
 13. **CSP 收紧**：pet/menu/usage 三页补 `object-src 'none'; base-uri 'none'; connect-src 'none'`。
@@ -79,7 +79,8 @@ test/               单元测试（node --test）
 
 - `build.win.target = ["nsis", "portable"]`：一次产出安装包 + 便携版。
 - 安装包：NSIS 向导式（`oneClick:false`），`perMachine:false` 提供「仅当前用户 / 所有用户」选择页，`installerLanguages: ["zh_CN", "en_US"]` 中文优先，可选安装目录 + 桌面/开始菜单快捷方式。
-- 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + zip + win-unpacked）。
+- Chromium 运行时语言资源只保留 `zh-CN` / `en-US`；README 使用的 `DSH2.png`、`DSniang02.png` 不进入安装包。
+- 产物分目录：`dist/installer/`（安装包 exe）、`dist/portable/`（便携版 exe + 单文件便携版 zip + win-unpacked）。
 - **发布上传范围**：Release 只上传「安装包 Setup exe」+「便携版 zip」；**不上传便携版单文件 exe**。AppImage 由 CI 自动挂上。
 - Linux 产物：AppImage 由 GitHub Actions 在 `v*` tag 时自动构建并挂 Release（`softprops/action-gh-release`）；也可在 Linux 上手动 `npm run dist:linux`。
 - 未做代码签名：SmartScreen 会提示「未知发布者」，需用户点「更多信息 → 仍要运行」。

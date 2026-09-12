@@ -14,6 +14,7 @@
   window.__whalePetLoaded = true
 
   var api = window.whaleAPI
+  var runtime = window.whaleRuntime
   if (!api) { console.error('[whale-pet] preload bridge missing'); return }
 
   var BASE_PX = 320
@@ -117,7 +118,7 @@
     message: '',
   }
   var busy = false
-  var refreshTimer = null
+  var refreshInterval = runtime.createIntervalController(function () { refresh(false) }, window)
   var idleCheckTimer = null
   var animId = null
   var shown = null
@@ -1239,6 +1240,7 @@
   var SQUISH = 'scaleY(0.88) scaleX(1.05)'
   var pressAudio = null
   var releaseAudio = null
+  var audioPair = runtime.createLazyAudioPair(Audio)
   var pressing = false
   var pressEnded = false
   var releasePlayed = false
@@ -1248,18 +1250,16 @@
     try {
       var pressSrc = pressSound ? resolveImgPath(pressSound) : (soundSet === 'fx1' ? '../assets/D1.mp3' : '../assets/Ya1.mp3')
       var releaseSrc = releaseSound ? resolveImgPath(releaseSound) : (soundSet === 'fx1' ? '../assets/D2.mp3' : '../assets/Ya2.mp3')
-      pressAudio = new Audio(pressSrc)
-      pressAudio.preload = 'auto'
-      pressAudio.volume = soundVol
-      releaseAudio = new Audio(releaseSrc)
-      releaseAudio.preload = 'auto'
-      releaseAudio.volume = soundVol
+      audioPair.configure(pressSrc, releaseSrc, soundVol)
+      pressAudio = null
+      releaseAudio = null
     } catch (err) {}
   }
 
   function playPress() {
-    if (!pressAudio || !soundOn) return
+    if (!soundOn) return
     try {
+      pressAudio = audioPair.getPress()
       if (releaseTimer) { clearTimeout(releaseTimer); releaseTimer = null }
       if (releaseAudio) {
         releaseAudio.pause()
@@ -1278,9 +1278,10 @@
   }
 
   function playRelease() {
-    if (releasePlayed || !releaseAudio || !soundOn) return
+    if (releasePlayed || !soundOn) return
     releasePlayed = true
     try {
+      releaseAudio = audioPair.getRelease()
       releaseAudio.currentTime = 0
       var p = releaseAudio.play()
       if (p && typeof p.catch === 'function') p.catch(function () {})
@@ -1384,9 +1385,8 @@
     var interval = Math.round((typeof c.refreshInterval === 'number' ? c.refreshInterval : 60) * 1000)
     if (interval !== refreshIntervalMs) {
       refreshIntervalMs = interval
-      if (refreshTimer) clearInterval(refreshTimer)
-      refreshTimer = setInterval(function () { refresh(false) }, refreshIntervalMs)
     }
+    refreshInterval.start(refreshIntervalMs)
     applySoundSet()
     applyExpressionConfig(c.expressions)
     applyBubbleStroke(bubbleColor)
@@ -1423,7 +1423,6 @@
     reportShape() // 按鲸鱼位置裁剪窗口 → 透明区域点击穿透
     api.getCustom().then(applyCustom).catch(function () {})
     refresh(false)
-    refreshTimer = setInterval(function () { refresh(false) }, refreshIntervalMs)
     idleCheckTimer = setInterval(checkIdle, 1500)
   }
   init().catch(function (err) { console.error('[whale-pet] init failed', err) })
